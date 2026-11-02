@@ -1,0 +1,44 @@
+{% extends 'shop/base.html' %}
+{% from 'shop/_card.html' import product_card with context %}
+{% block content %}
+<section class="hero">
+  <div class="wrap">
+    <h1>Quality laptops and gadgets, ready to order.</h1>
+    <p>See what's in stock right now, pay online or at the shop, and collect your order or have it delivered.</p>
+    <form class="hero-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
+      <input type="search" name="q" placeholder="Try &quot;Dell Latitude&quot; or &quot;AirPods&quot;" aria-label="Search products">
+      <button class="btn btn-gold" type="submit">Search</button>
+    </form>
+    <div class="chips">
+      {% for name, n in categories %}
+        <a class="chip" href="{{ url_for('shop.catalog', category=name) }}">{{ name }} <small>{{ n }}</small></a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Available now</h2>
+      <a href="{{ url_for('shop.catalog') }}">See all {{ total }} products in stock</a>
+    </div>
+    {% if featured %}
+      <div class="grid">{% for p in featured %}{{ product_card(p) }}{% endfor %}</div>
+    {% else %}
+      <div class="empty"><h3>New stock is on its way</h3><p class="muted">Check back soon{% if biz.whatsapp %} or <a href="https://wa.me/{{ biz.whatsapp }}">message us on WhatsApp</a>{% endif %}.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <h2>How ordering works</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <div class="panel"><h3>1. Choose and check out</h3><p class="muted" style="margin:0">Add items to your cart and enter your contact details. No account needed.</p></div>
+      <div class="panel"><h3>2. Pay your way</h3><p class="muted" style="margin:0">Pay online, or reserve your items and pay when you arrive. We hold them while you do.</p></div>
+      <div class="panel"><h3>3. Collect or get it delivered</h3><p class="muted" style="margin:0">We'll mark your order ready. Track it any time with your order number.</p></div>
+    </div>
+  </div>
+</section>
+{% endblock %}

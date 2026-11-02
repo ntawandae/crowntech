@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f4f4f4;
+            padding-bottom: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin-top: 20px;
+            padding: 0 15px;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: #1e3a8a;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            padding: 10px 15px;
+        }
+        .table {
+            font-size: 0.9rem;
+        }
+        .table th {
+            background: #3b82f6;
+            color: white;
+        }
+        .summary {
+            background: #d1fae5;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .summary p {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        .date-picker-section {
+            background: #ffffff;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .date-picker-section label {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #1e3a8a;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .date-picker-section .input-group {
+            max-width: 100%;
+        }
+        .date-picker-section .form-control {
+            font-size: 1.1rem;
+            padding: 10px;
+            border-color: #3b82f6;
+        }
+        .date-picker-section .btn {
+            font-size: 1rem;
+            padding: 10px 20px;
+            margin: 5px 5px 0 0;
+            white-space: nowrap;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+            min-height: 250px;
+        }
+        .pagination {
+            justify-content: center;
+        }
+        @media (max-width: 576px) {
+            .container {
+                padding: 0 10px;
+            }
+            .card-header {
+                font-size: 1rem;
+            }
+            .table {
+                font-size: 0.8rem;
+            }
+            .summary p {
+                font-size: 0.9rem;
+            }
+            .date-picker-section label {
+                font-size: 1rem;
+            }
+            .date-picker-section .form-control {
+                font-size: 1rem;
+                width: 100%;
+                padding: 8px;
+            }
+            .date-picker-section .btn {
+                font-size: 0.9rem;
+                padding: 8px 15px;
+                width: 100%;
+                margin: 5px 0;
+            }
+            h2 {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include 'cashier_base.html' %}
+    <div class="container">
+        <h2 class="mt-4 text-center text-md-start">Daily Report for {{ date }}</h2>
+        <div class="date-picker-section">
+            <label for="selected_date">Select Report Date</label>
+            <form method="POST">
+                <div class="input-group d-flex flex-column flex-md-row">
+                    <input type="date" class="form-control" id="selected_date" name="selected_date" value="{{ selected_date }}" aria-label="Select report date">
+                    <button type="submit" class="btn btn-primary">View Report</button>
+                    <button type="submit" name="action" value="export_pdf" class="btn btn-success">Export as PDF</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Cash Summary</div>
+            <div class="card-body summary">
+                <p>Opening Balance: ${{ "%.2f"|format(opening_balance) }}</p>
+                <p>Total Sales: ${{ "%.2f"|format(total_sales) }}</p>
+                <p>Total Extra Income: ${{ "%.2f"|format(total_income) }}</p>
+                <p>Total Expenses: ${{ "%.2f"|format(total_expenses) }}</p>
+                <p>Net Cash Flow: ${{ "%.2f"|format(net_cash_flow) }}</p>
+                <p>Closing Balance: ${{ "%.2f"|format(closing_balance) }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Sales Chart</div>
+            <div class="card-body">
+                <canvas id="salesChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Sales</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr><th>Receipt #</th><th>Product</th><th>Qty</th><th>Total</th><th>Time</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in sales.items %}
+                            <tr>
+                                <td>{{ sale.product.name }}</td>
+                                <td>{{ sale.quantity }}</td>
+                                <td>${{ "%.2f"|format(sale.total_price) }}</td>
+                                <td>{{ sale.timestamp.strftime('%H:%M:%S') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5">No sales for this day.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if sales.has_prev or sales.has_next %}
+                <nav aria-label="Sales pagination">
+                    <ul class="pagination">
+                        {% if sales.has_prev %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('cashier.daily_report', page=sales.prev_num, selected_date=selected_date) }}">Previous</a></li>
+                        {% endif %}
+                        {% if sales.has_next %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('cashier.daily_report', page=sales.next_num, selected_date=selected_date) }}">Next</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Expenses</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr><th>Description</th><th>Amount</th><th>Time</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for expense in expenses.items %}
+                            <tr>
+                                <td>{{ expense.description }}</td>
+                                <td>${{ "%.2f"|format(expense.amount) }}</td>
+                                <td>{{ expense.timestamp.strftime('%H:%M:%S') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3">No expenses for this day.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Extra Income</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr><th>Description</th><th>Amount</th><th>Time</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for income in incomes.items %}
+                            <tr>
+                                <td>{{ income.description }}</td>
+                                <td>${{ "%.2f"|format(income.amount) }}</td>
+                                <td>{{ income.timestamp.strftime('%H:%M:%S') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3">No extra income for this day.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Stock Requests</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr><th>Product</th><th>Qty</th><th>Action</th><th>Reason</th><th>Status</th><th>Time</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for request in stock_requests.items %}
+                            <tr>
+                                <td>{{ request.product.name }}</td>
+                                <td>{{ request.quantity }}</td>
+                                <td>{{ request.reason or 'N/A' }}</td>
+                                <td>{{ request.status|capitalize }}</td>
+                                <td>{{ request.timestamp.strftime('%H:%M:%S') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6">No stock requests for this day.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Defect Requests</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr><th>Product</th><th>Qty</th><th>Reason</th><th>Status</th><th>Time</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for request in defect_requests.items %}
+                            <tr>
+                                <td>{{ request.product.name }}</td>
+                                <td>{{ request.quantity }}</td>
+                                <td>{{ request.status|capitalize }}</td>
+                                <td>{{ request.timestamp.strftime('%H:%M:%S') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5">No defect requests for this day.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: {{ labels|tojson }},
+                    datasets: [
+                        {
+                            label: 'Sales ($)',
+                            data: {{ sales_data|tojson }},
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            fill: true
+                        },
+                        {
+                            label: 'Expenses ($)',
+                            data: {{ expenses_data|tojson }},
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                            fill: true
+                        },
+                        {
+                            label: 'Extra Income ($)',
+                            data: {{ income_data|tojson }},
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Amount ($)' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Hour' }
+                        }
+                    }
+                }
+            });
+        </script>
+    </div>
+</body>
+</html>

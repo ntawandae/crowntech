@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 12px;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            border-bottom: 1px solid #aaa;
+            padding-bottom: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #999;
+            padding: 5px;
+            text-align: left;
+        }
+        .section {
+            margin-top: 20px;
+        }
+        .summary p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>📄 Business Report</h1>
+<p><strong>Period:</strong> {{ current_range|capitalize }} — up to {{ date }}</p>
+
+<div class="section">
+    <h2>💰 Sales</h2>
+    {% if sales %}
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th><th>Qty</th><th>Total</th><th>Profit</th><th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in sales %}
+            <tr>
+                <td>{{ s.product.name }}</td>
+                <td>{{ s.quantity }}</td>
+                <td>${{ "%.2f"|format(s.total_price) }}</td>
+                <td>${{ "%.2f"|format(s.profit) }}</td>
+                <td>{{ s.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No sales in this period.</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>📦 Stock Requests</h2>
+    {% if stock_requests %}
+    <table>
+        <thead>
+            <tr><th>Product</th><th>Qty</th><th>Status</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+        {% for req in stock_requests %}
+            <tr>
+                <td>{{ req.product.name }}</td>
+                <td>{{ req.quantity }}</td>
+                <td>{{ req.status }}</td>
+                <td>{{ req.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No stock requests in this period.</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>🧾 Expenses</h2>
+    {% if expenses %}
+    <table>
+        <thead><tr><th>Description</th><th>Amount</th><th>Time</th></tr></thead>
+        <tbody>
+        {% for e in expenses %}
+            <tr>
+                <td>{{ e.description }}</td>
+                <td>${{ "%.2f"|format(e.amount) }}</td>
+                <td>{{ e.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No expenses in this period.</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>⚠️ Defects</h2>
+    {% if defect_requests %}
+    <table>
+        <thead><tr>
+            <th>Product</th><th>Qty</th><th>Reason</th><th>By</th><th>Status</th><th>Time</th>
+        </tr></thead>
+        <tbody>
+        {% for d in defect_requests %}
+            <tr>
+                <td>{{ d.product.name }}</td>
+                <td>{{ d.quantity }}</td>
+                <td>{{ d.reason }}</td>
+                <td>{{ d.submitted_user.username }}</td>
+                <td>{{ d.status|capitalize }}</td>
+                <td>{{ d.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No defect records in this period.</p>
+    {% endif %}
+</div>
+
+<div class="section summary">
+    <h2>📌 Summary</h2>
+    <p><strong>Total Sales:</strong> ${{ "%.2f"|format(total_sales) }}</p>
+    <p><strong>Total Expenses:</strong> ${{ "%.2f"|format(total_expenses) }}</p>
+    <p><strong>Cash Expected:</strong> ${{ "%.2f"|format(total_sales - total_expenses) }}</p>
+    <p><strong>Total Profit:</strong> ${{ "%.2f"|format(total_profit - total_expenses) }}</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,102 @@
+{% extends 'staff/base.html' %}
+{% block title %}{{ order.order_number }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ url_for('staff_orders.order_list') }}">&larr; All online orders</a></p>
+<div class="section-head">
+  <div><h1 style="font-size:1.8rem;margin:0">{{ order.order_number }}</h1><span class="muted small">Placed {{ order.created_at|when }}{% if order.paid_at %} &middot; paid {{ order.paid_at|when }}{% endif %}</span></div>
+  <div class="actions">
+    <span class="badge {{ 'badge-ok' if order.payment_status == 'paid' else 'badge-warn' }}">{{ 'Paid' if order.payment_status == 'paid' else ('Refunded' if order.payment_status == 'refunded' else 'Not paid') }}</span>
+    <span class="badge {{ 'badge-ok' if order.status in ('paid','ready','completed') else ('badge-bad' if order.status == 'cancelled' else 'badge-warn') }}">{{ order.status_label }}</span>
+  </div>
+</div>
+
+<div class="two-col">
+  <div>
+    <section class="panel">
+      <h2>Items</h2>
+      <div class="table-wrap" style="border:0"><table class="tbl" style="min-width:0">
+        <thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead>
+        <tbody>
+        {% for i in order.items %}
+          <tr><td>{{ i.product_name.split('|')[0][:100] }}</td><td class="r num">{{ i.quantity }}</td><td class="r num">{{ i.unit_price|money }}</td><td class="r num">{{ i.line_total|money }}</td></tr>
+        {% endfor %}
+          {% if order.delivery_fee %}<tr><td>Delivery</td><td></td><td></td><td class="r num">{{ order.delivery_fee|money }}</td></tr>{% endif %}
+          <tr><td colspan="3" class="r"><strong>Total</strong></td><td class="r num"><strong>{{ order.total|money }}</strong></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="panel">
+      <h2>Payment attempts</h2>
+      {% if order.payments %}
+      <div class="table-wrap" style="border:0"><table class="tbl" style="min-width:0">
+        <thead><tr><th>Provider</th><th>Reference</th><th>Status</th><th>Last update</th></tr></thead>
+        <tbody>{% for p in order.payments %}
+          <tr><td>{{ p.provider|title }}</td><td class="small" style="overflow-wrap:anywhere">{{ p.provider_ref }}</td>
+              <td><span class="badge {{ 'badge-ok' if p.status == 'paid' else ('badge-bad' if p.status == 'failed' else '') }}">{{ p.status }}</span><div class="muted small">{{ p.detail }}</div></td>
+              <td class="small">{{ p.updated_at|when }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% else %}<p class="muted" style="margin:0">No online payment has been started for this order.</p>{% endif %}
+    </section>
+  </div>
+
+  <aside>
+    <section class="panel">
+      <h3>Customer</h3>
+      <dl class="kv small" style="grid-template-columns:90px 1fr">
+        <dt>Name</dt><dd>{{ order.customer_name }}</dd>
+        <dt>Phone</dt><dd><a href="tel:{{ order.customer_phone }}">{{ order.customer_phone }}</a></dd>
+        <dt>Email</dt><dd><a href="mailto:{{ order.customer_email }}">{{ order.customer_email }}</a></dd>
+        <dt>{{ 'Deliver to' if order.delivery_method == 'delivery' else 'Collection' }}</dt><dd>{{ order.delivery_address if order.delivery_method == 'delivery' else 'Collects from the shop' }}</dd>
+        {% if order.notes %}<dt>Customer note</dt><dd>{{ order.notes }}</dd>{% endif %}
+        {% if order.expires_at and order.status in ('pending_payment','reserved') %}<dt>Stock held until</dt><dd>{{ order.expires_at|when }}</dd>{% endif %}
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h3>Actions</h3>
+      <div style="display:grid;gap:12px">
+        {% if order.payment_status != 'paid' and order.status != 'cancelled' %}
+        <form method="post" action="{{ url_for('staff_orders.order_action', order_id=order.id) }}" class="actions">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="action" value="mark_paid">
+          <select name="method" aria-label="How was it paid" style="width:auto"><option value="pay_at_shop">Paid at the shop</option><option value="manual">Paid another way</option></select>
+          <button class="btn btn-gold btn-sm" type="submit">Record payment</button>
+        </form>
+        {% if order.payments %}
+        <form method="post" action="{{ url_for('staff_orders.order_action', order_id=order.id) }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="action" value="recheck">
+          <button class="btn btn-ghost btn-sm" type="submit">Re-check with Paynow</button>
+        </form>{% endif %}
+        {% endif %}
+        {% if order.status == 'paid' %}
+        <form method="post" action="{{ url_for('staff_orders.order_action', order_id=order.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="action" value="ready"><button class="btn btn-sm" type="submit">Mark ready</button></form>
+        {% endif %}
+        {% if order.status in ('paid','ready') %}
+        <form method="post" action="{{ url_for('staff_orders.order_action', order_id=order.id) }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="action" value="complete"><button class="btn btn-sm" type="submit">{{ 'Mark delivered' if order.delivery_method == 'delivery' else 'Mark collected' }}</button></form>
+        {% endif %}
+        {% if order.status in ('pending_payment','reserved','paid','ready') %}
+        <form method="post" action="{{ url_for('staff_orders.order_action', order_id=order.id) }}" onsubmit="return confirm('Cancel this order and return the stock?')" style="display:grid;gap:8px">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="action" value="cancel">
+          <input name="reason" placeholder="Reason (optional)" aria-label="Cancellation reason">
+          {% if order.payment_status == 'paid' %}<label style="font-weight:500;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" name="confirm_refund" value="yes" style="width:auto;margin-top:4px"> I have refunded this customer in Paynow/PayPal</label>{% endif %}
+          <button class="btn btn-danger btn-sm" type="submit">Cancel order</button>
+        </form>
+        {% endif %}
+        {% if order.payment_status == 'paid' and order.status != 'cancelled' %}
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('shop.order_receipt', order_number=order.order_number) }}">Download receipt (PDF)</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>Staff note</h3>
+      <form method="post" action="{{ url_for('staff_orders.order_action', order_id=order.id) }}" style="display:grid;gap:8px">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="action" value="note">
+        <textarea name="note" aria-label="Staff note" maxlength="500">{{ order.staff_note or '' }}</textarea>
+        <button class="btn btn-ghost btn-sm" type="submit">Save note</button>
+      </form>
+    </section>
+  </aside>
+</div>
+{% endblock %}

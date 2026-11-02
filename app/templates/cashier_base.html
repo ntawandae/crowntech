@@ -1,0 +1,143 @@
+<!-- templates/cashier_base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{% block title %}Cashier Panel{% endblock %}</title>
+<style>
+
+/* Nav bar */
+nav {
+    background-color: #007bff;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    position: relative;
+    z-index: 2;
+}
+
+.nav-left {
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.nav-left a {
+    color: white;
+    text-decoration: none;
+}
+
+/* Navigation links */
+.nav-links {
+    display: flex;
+    gap: 15px;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    font-size: 15px;
+}
+
+/* Checkbox hack for mobile */
+.nav-toggle-checkbox {
+    display: none;
+}
+
+.nav-toggle-label {
+    display: none;
+    flex-direction: column;
+    cursor: pointer;
+    z-index: 3;
+}
+
+.nav-toggle-label span {
+    background: white;
+    height: 3px;
+    width: 25px;
+    margin: 4px 0;
+    border-radius: 2px;
+}
+
+/* Overlay for click outside close */
+.nav-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 1;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .nav-links {
+        display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 60px;
+        right: 0;
+        background-color: #007bff;
+        width: 200px;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 2;
+    }
+
+    .nav-links a {
+        padding: 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+
+    /* Show toggle button */
+    .nav-toggle-label {
+        display: flex;
+    }
+
+    /* Show menu when checkbox checked */
+    .nav-toggle-checkbox:checked + .nav-toggle-label + .nav-links {
+        display: flex;
+    }
+
+    /* Show overlay when menu is open */
+    .nav-toggle-checkbox:checked ~ .nav-overlay {
+        display: block;
+    }
+}
+</style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-left">
+        <a href="{{ url_for('cashier.cashier_dashboard') }}">💼 Cashier Panel</a>
+    </div>
+
+    <!-- Hidden checkbox controls menu -->
+    <input type="checkbox" id="nav-toggle" class="nav-toggle-checkbox" />
+    <label for="nav-toggle" class="nav-toggle-label">
+        <span></span>
+        <span></span>
+        <span></span>
+    </label>
+
+    <div class="nav-links">
+        <a href="{{ url_for('staff_orders.order_list') }}">🛒 Orders{% if staff_pending_orders %} ({{ staff_pending_orders }}){% endif %}</a>
+        <a href="{{ url_for('cashier.my_requests') }}">🛠️ Requests</a>
+        <a href="{{ url_for('cashier.daily_report') }}">📄 Reports</a>
+        <a href="{{ url_for('cashier.quotations') }}">💬 Quotations</a>
+        <a href="{{ url_for('cashier.inventory') }}">📄 Inventory</a>
+          <a href="{{ url_for('auth.profile') }}">👤Profile</a>
+        <a href="{{ url_for('auth.logout') }}">🔒 Logout</a>
+    </div>
+</nav>
+
+<!-- Transparent overlay for click outside close -->
+<label for="nav-toggle" class="nav-overlay"></label>
+
+{% block content %}{% endblock %}
+
+</body>
+</html>

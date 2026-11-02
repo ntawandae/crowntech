@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Management</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            margin: 20px;
+            background: #f9fafb;
+        }
+
+        h2 {
+            text-align: center;
+            color: #111827;
+            margin-bottom: 20px;
+        }
+
+        /* ===== Buttons ===== */
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            font-size: 13px;
+            margin: 0 4px;
+        }
+
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-warning { background: #f59e0b; color: #fff; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-success { background: #16a34a; color: #fff; }
+        .btn-success:hover { background: #15803d; }
+        .btn-info { background: #0ea5e9; color: #fff; }
+        .btn-info:hover { background: #0284c7; }
+
+        /* ===== Table ===== */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+            margin-top: 25px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 14px;
+            color: #1e293b;
+        }
+
+        thead tr {
+            background: #f1f5f9;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 14px;
+            font-weight: 600;
+            color: #111827;
+            border-bottom: 2px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            background: #f8fafc;
+            z-index: 2;
+        }
+
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+
+        tbody tr:nth-child(odd) { background: #fafafa; }
+        tbody tr:hover { background: #eff6ff; transition: background 0.2s ease-in-out; }
+
+        .disabled { opacity: 0.5; }
+
+        td:last-child {
+            white-space: nowrap;
+            width: 300px;
+            text-align: right;
+        }
+
+        /* ===== Modals ===== */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #fff;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            margin: 20px;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #111827;
+            text-align: center;
+            font-size: 1.4rem;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .profile-item {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .profile-item strong {
+            display: block;
+            color: #475569;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .contract-link {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .contract-link:hover {
+            text-decoration: underline;
+        }
+
+        .modal-buttons {
+            text-align: right;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        /* ===== Flash messages ===== */
+        .flash {
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .flash-success { background: #16a34a; color: #fff; }
+        .flash-danger { background: #dc2626; color: #fff; }
+        .flash-warning { background: #f59e0b; color: #fff; }
+        .flash-info { background: #3b82f6; color: #fff; }
+    </style>
+</head>
+<body>
+    {% include 'admin_nav.html' %}
+
+    <h2>User Management</h2>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Create User Button -->
+    <div style="margin-bottom: 20px;">
+        <button class="btn btn-primary" onclick="openCreateModal()">➕ Create User</button>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Full Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                {% set profile = user.profile %}
+                <tr class="{% if user.role == 'disabled' %}disabled{% endif %}">
+                    <td>{{ user.full_name }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.role | capitalize }}</td>
+                    <td>
+                        {% if user.role == 'disabled' %}
+                            <strong style="color:#dc2626;">Disabled</strong>
+                        {% elif profile and not profile.editable %}
+                            <span style="color:#f59e0b;">Locked</span>
+                        {% else %}
+                            <span style="color:#16a34a;">Active</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <!-- View Details -->
+                        <button class="btn btn-info" onclick="openDetailsModal({{ user.id }})">View Details</button>
+
+                        <!-- Unlock Profile -->
+                        {% if profile and not profile.editable %}
+                        <form action="{{ url_for('admin.unlock_profile', user_id=user.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-success">Unlock Edit</button>
+                        </form>
+                        {% endif %}
+
+                        <!-- Reset Password -->
+                        <form action="{{ url_for('admin.reset_password', user_id=user.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-warning">Reset PW</button>
+                        </form>
+
+                        <!-- Enable / Disable -->
+                        {% if not (user.role == 'admin' and users|selectattr('role','equalto','admin')|list|length == 1) %}
+                        <form action="{{ url_for('admin.toggle_user', user_id=user.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-danger">
+                                {{ 'Enable' if user.role == 'disabled' else 'Disable' }}
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Create User Modal -->
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <h3>Create New User</h3>
+            <form method="POST" action="{{ url_for('admin.create_user') }}">
+                <input type="text" name="full_name" placeholder="Full Name" required style="width:100%;">
+                <input type="email" name="email" placeholder="Email" required style="width:100%;">
+                <input type="password" name="password" placeholder="Initial Password" required style="width:100%;">
+                <select name="role" required style="width:100%;">
+                    <option value="cashier">Cashier</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-danger" onclick="closeCreateModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <h3 id="detailsTitle">User Profile Details</h3>
+            <div id="detailsContent">
+                <!-- Filled via JavaScript -->
+                <p>Loading...</p>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="closeDetailsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Create User Modal
+        function openCreateModal() {
+            document.getElementById('createModal').style.display = 'flex';
+        }
+        function closeCreateModal() {
+            document.getElementById('createModal').style.display = 'none';
+        }
+
+        // View Details Modal
+        function openDetailsModal(userId) {
+            const modal = document.getElementById('detailsModal');
+            const title = document.getElementById('detailsTitle');
+            const content = document.getElementById('detailsContent');
+
+            // You need to pass user data via template or fetch via API. Here we assume data is injected.
+            // For simplicity, we'll use a data attribute or assume it's rendered in script (see note below)
+
+            // Placeholder: In real app, you'd fetch via AJAX or embed data in page
+            content.innerHTML = `
+                <p><strong>Note:</strong> Full profile details require server-side rendering or API call.</p>
+                <p>To implement properly, pass user profile data via Jinja or add an endpoint to fetch JSON.</p>
+            `;
+
+            // Temporary demo content (replace with real data in production)
+            const dummyData = {
+                phone: "N/A", id_number: "N/A", dob: "N/A", sex: "N/A",
+                address: "N/A", qualifications: "N/A", next_of_kin: "N/A",
+                next_of_kin_contact: "N/A", next_of_kin_address: "N/A", contract: false
+            };
+
+            // In production: loop through users and embed data in JS object
+            modal.style.display = 'flex';
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const createModal = document.getElementById('createModal');
+            const detailsModal = document.getElementById('detailsModal');
+            if (event.target === createModal) closeCreateModal();
+            if (event.target === detailsModal) closeDetailsModal();
+        }
+    </script>
+
+    <!-- Embed user profile data for JS access (Recommended for full functionality) -->
+    <script>
+        // Pass user profiles to JS for detailed view
+        const userProfiles = {
+            {% for user in users %}
+                {{ user.id }}: {
+                    full_name: "{{ user.full_name }}",
+                    email: "{{ user.username }}",
+                    role: "{{ user.role }}",
+                    phone_number: "{{ user.profile.phone_number or 'N/A' }}",
+                    id_number: "{{ user.profile.id_number or 'N/A' }}",
+                    dob: "{{ user.profile.dob or 'N/A' }}",
+                    sex: "{{ user.profile.sex or 'N/A' }}",
+                    address: "{{ user.profile.address or 'N/A' }}",
+                    qualifications: "{{ user.profile.qualifications or 'N/A' }}",
+                    next_of_kin: "{{ user.profile.next_of_kin or 'N/A' }}",
+                    next_of_kin_contact: "{{ user.profile.next_of_kin_contact or 'N/A' }}",
+                    next_of_kin_address: "{{ user.profile.next_of_kin_address or 'N/A' }}",
+                    contract_file: "{{ user.profile.contract_file or '' }}"
+                }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        };
+
+        function openDetailsModal(userId) {
+            const modal = document.getElementById('detailsModal');
+            const title = document.getElementById('detailsTitle');
+            const content = document.getElementById('detailsContent');
+            const data = userProfiles[userId] || {};
+
+            title.textContent = `${data.full_name || 'User'} - Full Profile`;
+
+            let contractLink = '';
+            if (data.contract_file) {
+                contractLink = `<a href="{{ url_for('static', filename='') }}${data.contract_file}" target="_blank" class="contract-link">View Contract</a>`;
+            } else {
+                contractLink = 'No contract uploaded';
+            }
+
+            content.innerHTML = `
+                <div class="profile-grid">
+                    <div class="profile-item"><strong>Email</strong>${data.email}</div>
+                    <div class="profile-item"><strong>Role</strong>${data.role ? data.role.charAt(0).toUpperCase() + data.role.slice(1) : 'N/A'}</div>
+                    <div class="profile-item"><strong>Phone Number</strong>${data.phone_number}</div>
+                    <div class="profile-item"><strong>ID Number</strong>${data.id_number}</div>
+                    <div class="profile-item"><strong>Date of Birth</strong>${data.dob}</div>
+                    <div class="profile-item"><strong>Sex</strong>${data.sex}</div>
+                    <div class="profile-item"><strong>Address</strong>${data.address}</div>
+                    <div class="profile-item"><strong>Qualifications</strong>${data.qualifications}</div>
+                    <div class="profile-item"><strong>Next of Kin</strong>${data.next_of_kin}</div>
+                    <div class="profile-item"><strong>Kin Contact</strong>${data.next_of_kin_contact}</div>
+                    <div class="profile-item"><strong>Kin Address</strong>${data.next_of_kin_address}</div>
+                    <div class="profile-item"><strong>Contract</strong>${contractLink}</div>
+                </div>
+            `;
+
+            modal.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

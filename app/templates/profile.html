@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Profile</title>
+<style>
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    margin: 20px;
+    background: #f9fafb;
+}
+h2 { text-align: center; color: #111827; margin-bottom: 20px; }
+
+/* Flash messages */
+.flash { padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-weight: 600; }
+.flash-success { background: #16a34a; color: #fff; }
+.flash-danger { background: #dc2626; color: #fff; }
+.flash-warning { background: #f59e0b; color: #fff; }
+.flash-info { background: #3b82f6; color: #fff; }
+
+/* Main layout: Card 1 takes ~25%, editable section takes ~75% on large screens */
+.main-layout {
+    display: grid;
+    grid-template-columns: 1fr 3fr; /* 25% : 75% ratio */
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+/* On smaller screens, stack vertically */
+@media (max-width: 900px) {
+    .main-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Regular card styling */
+.card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+    padding: 15px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.card h3 { 
+    text-align: center; 
+    margin: 0 0 10px 0; 
+    color: #111827; 
+}
+
+/* Big wrapper card for editable content */
+.big-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.big-card > h3 {
+    text-align: center;
+    margin: 0 0 10px 0;
+    color: #111827;
+    font-size: 1.25rem;
+}
+
+/* Grid inside the big card for the three editable cards */
+.editable-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+/* Small inner card for Change Password inside Card 1 */
+.inner-password-card {
+    margin-top: 20px;
+    padding-top: 20px;
+    border:2px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+    padding: 15px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.inner-password-card h3 {
+    text-align: center;
+    margin: 0 0 12px 0;
+    font-size: 1.1rem;
+}
+
+label { font-weight: 600; display: block; margin-bottom: 3px; }
+input, select { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px; }
+input:focus, select:focus { border-color: #3b82f6; outline: none; }
+
+.btn { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s ease-in-out; }
+.btn-primary { background: #3b82f6; color: #fff; }
+.btn-primary:hover { background: #2563eb; }
+.btn-danger { background: #dc2626; color: #fff; }
+.btn-danger:hover { background: #b91c1c; }
+
+a.contract-link { color: #3b82f6; text-decoration: none; display: inline-block; margin-bottom: 5px; }
+a.contract-link:hover { text-decoration: underline; }
+
+/* Submit button */
+.submit-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+}
+
+/* Password Modal */
+.modal { 
+    display: none; 
+    position: fixed; 
+    inset: 0; 
+    background: rgba(0,0,0,0.4); 
+    z-index: 50; 
+    align-items: center;
+    justify-content: center;
+}
+.modal-content { 
+    background: #fff; 
+    width: 400px; 
+    padding: 20px; 
+    border-radius: 12px; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.modal-content h3 { 
+    margin: 0 0 15px 0; 
+    text-align: center; 
+    color: #111827; 
+}
+.modal-buttons { 
+    text-align: right; 
+    margin-top: 10px; 
+}
+.modal-buttons button { 
+    margin-left: 8px; 
+}
+</style>
+</head>
+<body>
+
+{% if user.role == 'admin' %}
+    {% include 'admin_nav.html' %}
+{% elif user.role == 'cashier' %}
+    {% include 'cashier_base.html' %}
+{% endif %}
+
+<h2>My Profile</h2>
+
+<!-- Flash messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- Main layout: Card 1 ~25%, editable section ~75% on large screens -->
+<div class="main-layout">
+
+    <!-- Left: Card 1 - System Info (non-editable, narrower) -->
+    <div class="card">
+        <h3>System Info</h3>
+        <label>Full Name</label>
+        <input type="text" value="{{ user.full_name }}" disabled>
+        <label>Email</label>
+        <input type="text" value="{{ user.username }}" disabled>
+        <label>Role</label>
+        <input type="text" value="{{ user.role }}" disabled>
+
+        <!-- Change Password section inside Card 1 -->
+        <div class="inner-password-card">
+            <h3>Change Password</h3>
+            <button class="btn btn-primary" onclick="openPasswordModal()">Change Password</button>
+        </div>
+    </div>
+
+    <!-- Right: Big wrapper card containing editable cards + submit (wider) -->
+    <div class="big-card">
+
+        <form method="POST" enctype="multipart/form-data">
+            <!-- Grid for the three editable cards -->
+            <div class="editable-cards-grid">
+
+                <!-- Card 2: Personal Info -->
+                <div class="card">
+                    <h3>Personal Info</h3>
+                    <label>Phone Number</label>
+                    <input type="text" name="phone_number" value="{{ profile.phone_number }}" {% if not profile.editable %}disabled{% endif %}>
+                    <label>ID Number</label>
+                    <input type="text" name="id_number" value="{{ profile.id_number }}" {% if not profile.editable %}disabled{% endif %}>
+                    <label>Date of Birth</label>
+                    <input type="date" name="dob" value="{{ profile.dob }}" {% if not profile.editable %}disabled{% endif %}>
+                    <label>Sex</label>
+                    <select name="sex" {% if not profile.editable %}disabled{% endif %}>
+                        <option value="Male" {% if profile.sex=="Male" %}selected{% endif %}>Male</option>
+                        <option value="Female" {% if profile.sex=="Female" %}selected{% endif %}>Female</option>
+                    </select>
+                    <label>Qualifications</label>
+                    <input type="text" name="qualifications" value="{{ profile.qualifications }}" {% if not profile.editable %}disabled{% endif %}>
+                    <label>Address</label>
+                    <input type="text" name="address" value="{{ profile.address }}" {% if not profile.editable %}disabled{% endif %}>
+                </div>
+
+                <!-- Card 3: Next of Kin -->
+                <div class="card">
+                    <h3>Next of Kin</h3>
+                    <label>Name</label>
+                    <input type="text" name="next_of_kin" value="{{ profile.next_of_kin }}" {% if not profile.editable %}disabled{% endif %}>
+                    <label>Contact</label>
+                    <input type="text" name="next_of_kin_contact" value="{{ profile.next_of_kin_contact }}" {% if not profile.editable %}disabled{% endif %}>
+                    <label>Address</label>
+                    <input type="text" name="next_of_kin_address" value="{{ profile.next_of_kin_address }}" {% if not profile.editable %}disabled{% endif %}>
+                </div>
+
+                <!-- Card 4: Contract -->
+                <div class="card">
+                    <h3>Contract</h3>
+                    {% if profile.contract_file %}
+                        <a class="contract-link" href="{{ url_for('static', filename=profile.contract_file) }}" target="_blank">View Contract</a>
+                    {% endif %}
+                    <input type="file" name="contract_file" {% if not profile.editable %}disabled{% endif %}>
+                </div>
+
+            </div>
+
+            <!-- Submit button - clearly belongs only to the editable section -->
+            {% if profile.editable %}
+                <button type="submit" class="btn btn-primary submit-btn">Update Profile</button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Password Modal -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content">
+        <h3>Change Password</h3>
+        <form method="POST" action="{{ url_for('auth.profile') }}">
+            <input type="password" name="old_password" placeholder="Old Password" required style="width:100%; margin-bottom:10px; padding:8px; box-sizing:border-box;">
+            <input type="password" name="new_password" placeholder="New Password" required style="width:100%; margin-bottom:10px; padding:8px; box-sizing:border-box;">
+            <input type="password" name="confirm_password" placeholder="Confirm New Password" required style="width:100%; margin-bottom:10px; padding:8px; box-sizing:border-box;">
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-danger" onclick="closePasswordModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPasswordModal() { 
+    document.getElementById("passwordModal").style.display = "flex"; 
+}
+function closePasswordModal() { 
+    document.getElementById("passwordModal").style.display = "none"; 
+}
+window.onclick = function(event) {
+    let modal = document.getElementById("passwordModal");
+    if (event.target == modal) modal.style.display = "none";
+}
+</script>
+
+</body>
+</html>

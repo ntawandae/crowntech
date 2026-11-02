@@ -1,0 +1,15 @@
+{% extends 'shop/base.html' %}
+{% block title %}Sign in | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap"><div class="panel auth-card">
+  <h1 style="font-size:1.7rem">Sign in</h1>
+  <p class="muted">See your orders and check out faster.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="email">Email</label><input id="email" type="email" name="email" autocomplete="username" required></div>
+    <div class="field"><label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required></div>
+    <button class="btn btn-gold btn-block" type="submit">Sign in</button>
+  </form>
+  <p class="small" style="margin:16px 0 0">New here? <a href="{{ url_for('shop.register', next=request.args.get('next')) }}">Create an account</a>. You can also check out as a guest.</p>
+</div></div>
+{% endblock %}

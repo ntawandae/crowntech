@@ -1,0 +1,47 @@
+{% extends 'shop/base.html' %}
+{% block title %}Your cart | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <h1 style="font-size:2rem">Your cart</h1>
+  {% if lines %}
+  <div class="two-col">
+    <div class="panel">
+      {% for l in lines %}
+      <div class="line">
+        <a class="line-img" href="{{ url_for('shop.product', product_id=l.p.id) }}">{% if l.p.image %}<img src="{{ l.p.image }}" alt="">{% endif %}</a>
+        <div>
+          <div class="line-title"><a href="{{ url_for('shop.product', product_id=l.p.id) }}" style="text-decoration:none">{{ l.p.title }}</a></div>
+          <div class="muted small num">{{ l.p.price|money }} each</div>
+          <div class="qty-form">
+            <form method="post" action="{{ url_for('shop.cart_set', product_id=l.p.id) }}" class="actions">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <label class="small" for="q{{ l.p.id }}" style="position:absolute;left:-999px">Quantity</label>
+              <input id="q{{ l.p.id }}" type="number" name="qty" value="{{ l.qty }}" min="1" max="{{ l.p.qty }}" inputmode="numeric">
+              <button class="btn btn-ghost btn-sm" type="submit">Update</button>
+            </form>
+            <form method="post" action="{{ url_for('shop.cart_remove', product_id=l.p.id) }}">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="link-btn" type="submit">Remove</button>
+            </form>
+          </div>
+        </div>
+        <div class="price num" style="font-size:1.1rem">{{ l.total|money }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <aside class="panel summary">
+      <h2>Order summary</h2>
+      <div class="totals">
+        <div><span>Subtotal</span><span class="num">{{ subtotal|money }}</span></div>
+        <div class="grand"><span>Total</span><span class="num">{{ subtotal|money }}</span></div>
+      </div>
+      <p class="muted small">Delivery, if you choose it, is added at checkout.</p>
+      <a class="btn btn-gold btn-block" href="{{ url_for('shop.checkout') }}">Go to checkout</a>
+      <p style="text-align:center;margin:12px 0 0"><a class="small" href="{{ url_for('shop.catalog') }}">Keep shopping</a></p>
+    </aside>
+  </div>
+  {% else %}
+  <div class="empty"><h2>Your cart is empty</h2><p class="muted">Find something you like and add it here.</p><a class="btn btn-gold" href="{{ url_for('shop.catalog') }}">Browse products</a></div>
+  {% endif %}
+</div>
+{% endblock %}

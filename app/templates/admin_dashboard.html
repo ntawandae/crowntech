@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* General Dashboard Styles */
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 4px;
+            margin: 0;
+            font-size: 13px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+        }
+
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 8px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 5px 5px 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background-color: white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+            color: #333;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+            font-weight: 500;
+        }
+
+        td {
+            background: #f9fafb;
+            vertical-align: middle;
+        }
+
+        button, .btn {
+            background-color: #3b82f6;
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background-color 0.3s ease;
+            touch-action: manipulation;
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        button:hover, .btn:hover {
+            background-color: #2563eb;
+        }
+
+        .success-btn {
+            background-color: #10b981;
+        }
+
+        .success-btn:hover {
+            background-color: #059669;
+        }
+
+        .danger-btn {
+            background-color: #ef4444;
+        }
+
+        .danger-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .info-btn {
+            background-color: #17a2b8;
+        }
+
+        .info-btn:hover {
+            background-color: #138496;
+        }
+
+        .flash-messages {
+            margin-bottom: 4px;
+        }
+
+        .flash-message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            position: relative;
+            background: #f0f0f0;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .flash-message.success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+
+        .flash-message.danger {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #dc2626;
+        }
+
+        .flash-message.info {
+            background: #e6f3ff;
+            border: 1px solid #3b82f6;
+            color: #3b82f6;
+        }
+
+        .flash-message.warning {
+            background: #fff3e6;
+            border: 1px solid #f59e0b;
+            color: #f59e0b;
+        }
+
+        .flash-message .dismiss {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            color: inherit;
+        }
+
+        a {
+            text-decoration: none;
+            color: #3b82f6;
+            transition: color 0.3s ease;
+        }
+
+        a:hover {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+
+        /* Product Table Styles */
+        .product-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background-color: #fff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .product-table th,
+        .product-table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: middle;
+            font-size: 0.9rem;
+            color: #333;
+        }
+
+        .product-table th {
+            background-color: #007bff;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .product-table td {
+            background-color: #f9fafb;
+        }
+
+        .product-table tbody tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .product-img {
+            max-width: 60px;
+            max-height: 60px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: block;
+        }
+
+        .product-img[alt][src=""] {
+            display: none;
+        }
+
+        .product-table th:nth-child(2),
+        .product-table td:nth-child(2) {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .product-table th:nth-child(5),
+        .product-table td:nth-child(5),
+        .product-table th:nth-child(6),
+        .product-table td:nth-child(6),
+        .product-table th:nth-child(7),
+        .product-table td:nth-child(7) {
+            text-align: center;
+        }
+
+        .product-table th:nth-child(8),
+        .product-table td:nth-child(8) {
+            width: 50px;
+            white-space: nowrap;
+        }
+
+        .product-table .btn {
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            margin-right: 4px;
+            min-height: 32px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow-y: auto;
+            touch-action: manipulation;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 5px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            box-sizing: border-box;
+            max-height: 90vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-content h2 {
+            color: #1e3a8a;
+            margin-top: 0;
+            font-size: 1.5rem;
+        }
+
+        .modal .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .modal .close:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+
+        .form-group input[type="number"] {
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+        }
+
+        .form-group input:focus, .form-group select:focus, form input:focus, form select:focus {
+            outline: none;
+            box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+            border-color: #3b82f6;
+        }
+
+        .form-group button {
+            width: 100%;
+            padding: 10px;
+            font-size: 13px;
+            min-height: 44px;
+        }
+
+        form input, form select {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+
+        form input[type="number"] {
+            width: 100px;
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+        }
+
+        form select {
+            width: 200px;
+        }
+
+        form input[type="file"] {
+            padding: 3px;
+        }
+
+        /* Responsive Table Adjustments */
+        @media (max-width: 768px) {
+            .product-table {
+                table-layout: fixed;
+                font-size: 0.8rem;
+                width: 100%;
+                max-width: 100%;
+                overflow-x: auto;
+                display: block;
+            }
+
+            .product-table th,
+            .product-table td {
+                padding: 6px 8px;
+            }
+
+            .product-table th:nth-child(3),
+            .product-table td:nth-child(3),
+            .product-table th:nth-child(4),
+            .product-table td:nth-child(4),
+            .product-table th:nth-child(1),
+            .product-table td:nth-child(1) {
+                display: none;
+            }
+
+            .product-table th:nth-child(1),
+            .product-table td:nth-child(1) {
+                width: 15%;
+            }
+
+            .product-table th:nth-child(2),
+            .product-table td:nth-child(2) {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: normal;
+            }
+
+            .product-table th:nth-child(5),
+            .product-table td:nth-child(5) {
+                width: 15%;
+            }
+
+            .product-table th:nth-child(6),
+            .product-table td:nth-child(6) {
+                width: 20%;
+            }
+
+            .product-table th:nth-child(8),
+            .product-table td:nth-child(8) {
+                width: auto;
+                min-width: 70px;
+                display: flex;
+                gap: 3px;
+            }
+
+            .product-table .btn {
+                padding: 4px 6px;
+                font-size: 0.75rem;
+                min-height: 28px;
+            }
+
+            .product-img {
+                max-width: 35px;
+                max-height: 35px;
+            }
+
+            .product-table td:nth-child(2) {
+                width: auto;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                white-space: normal;
+                line-height: 1.2;
+            }
+
+            .modal-content {
+                margin: 10% auto;
+                width: 95%;
+                max-width: 400px;
+            }
+
+            .form-group input,
+            form input,
+            form select {
+                font-size: 12px;
+                padding: 6px;
+                min-height: 40px;
+            }
+
+            .form-group button {
+                font-size: 12px;
+                min-height: 40px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .product-table {
+                font-size: 0.75rem;
+            }
+
+            .product-table th,
+            .product-table td {
+                padding: 4px 6px;
+            }
+
+            .product-table th:nth-child(8),
+            .product-table td:nth-child(8) {
+                min-width: 0;
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .product-table .btn {
+                padding: 3px 5px;
+                font-size: 0.7rem;
+                min-height: 24px;
+                width: 100%;
+                text-align: center;
+            }
+
+            .product-img {
+                max-width: 30px;
+                max-height: 30px;
+            }
+
+            .modal-content {
+                margin: 15% auto;
+                width: 98%;
+                max-width: 320px;
+            }
+
+            .form-group input,
+            form input,
+            form select {
+                font-size: 11px;
+                padding: 5px;
+                min-height: 36px;
+            }
+
+            .form-group button {
+                font-size: 11px;
+                min-height: 36px;
+            }
+
+            .flash-message {
+                font-size: 11px;
+                padding: 8px;
+            }
+        }
+
+        /* Quotations Styles */
+        #quotations {
+            background: #f5f7fa;
+            font-size: 14px;
+        }
+
+        #quotations h2, #quotations h4 {
+            margin-bottom: 20px;
+        }
+
+        #quotations .quote-box {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        #quotations .quote-details {
+            display: none;
+            background: #fcfcfc;
+            border: 1px dashed #ccc;
+            padding: 15px;
+        }
+
+        #quotations .custom-product-entry input,
+        #quotations .custom-product-entry select {
+            margin-bottom: 5px;
+            min-height: 44px;
+            font-size: 14px;
+            touch-action: manipulation;
+        }
+
+        #quotations .flex-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: nowrap;
+            margin-bottom: 30px;
+        }
+
+        #quotations .flex-child {
+            flex: 1;
+        }
+
+        @media (max-width: 768px) {
+            #quotations .flex-row {
+                flex-direction: column;
+            }
+
+            #quotations .flex-child {
+                margin-bottom: 20px;
+            }
+
+            #quotations {
+                padding: 4px;
+                font-size: 12px;
+            }
+
+            #quotations h2, #quotations h4 {
+                font-size: 1rem;
+                margin: 0 0 8px 0;
+            }
+
+            #quotations .quote-box {
+                padding: 8px;
+                margin: 0 0 8px 0;
+            }
+
+            #quotations .custom-product-entry input,
+            #quotations .custom-product-entry select {
+                font-size: 12px;
+                padding: 6px 8px;
+                min-height: 40px;
+            }
+
+            #quotations button.btn {
+                padding: 8px;
+                font-size: 12px;
+                min-height: 40px;
+            }
+
+            #quotations table {
+                font-size: 11px;
+                margin: 0 0 8px 0;
+                table-layout: fixed;
+                overflow-x: auto;
+            }
+
+            #quotations th, #quotations td {
+                padding: 8px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #quotations {
+                font-size: 11px;
+                padding: 3px;
+            }
+
+            #quotations h2, #quotations h4 {
+                font-size: 0.95rem;
+                margin: 0 0 6px 0;
+            }
+
+            #quotations .quote-box {
+                padding: 6px;
+                margin: 0 0 6px 0;
+            }
+
+            #quotations .custom-product-entry input,
+            #quotations .custom-product-entry select {
+                font-size: 11px;
+                padding: 6px;
+                min-height: 36px;
+            }
+
+            #quotations button.btn {
+                padding: 6px;
+                font-size: 11px;
+                min-height: 36px;
+            }
+
+            #quotations table {
+                margin: 0 0 6px 0;
+            }
+
+            #quotations th, #quotations td {
+                padding: 6px;
+                font-size: 10px;
+            }
+        }
+
+        /* Overview (Daily Report) Styles */
+        #overview {
+            box-sizing: border-box;
+            width: 100%;
+            overflow-x: hidden;
+        }
+
+        #overview h1, #overview h2 {
+            color: #1e3a8a;
+            margin: 0 0 10px 0;
+            line-height: 1.2;
+        }
+
+        #overview h1 {
+            font-weight: 700;
+            font-size: 1.5rem;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        #overview h2 {
+            border-bottom: 3px solid #3b82f6;
+            padding-bottom: 4px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        #overview h3 {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        #overview .card {
+            background: white;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 0 10px 0;
+            padding: 8px;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgb(0 0 0 / 0.04);
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        #overview .card-header {
+            background-color: #007bff;
+            color: white;
+            padding: 8px;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        #overview .card-body {
+            padding: 8px;
+        }
+
+#overview .date-picker-section {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+#overview .date-picker-section  a{
+    display: inline-flex;               /* ensures text centers */
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    text-decoration: none !important;   /* remove underline */
+}
+
+#overview .date-picker-section label {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.date-picker-section form input { margin:0;}
+
+#overview .date-picker-section input[type="date"] {
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    margin-right: 5px;
+    border-radius: 4px;
+    font-size: 13px;
+    height: 12px;
+    line-height: 1.2;
+    transition: border-color 0.3s ease;
+}
+
+#overview .date-picker-section input[type="date"]:focus {
+    border-color: #3b82f6;
+    outline: none;
+    box-shadow: 0 0 4px rgba(59,130,246,0.4);
+}
+
+#overview .date-picker-section .btn {
+    font-size: 13px;
+    margin-right: 5px;
+    line-height: 1.2;
+    height: 12px;
+    border-radius: 4px;
+}
+
+#overview .date-picker-section .btn-primary {
+    background-color: #3b82f6;
+    border: none;
+}
+
+#overview .date-picker-section .btn-primary:hover {
+    background-color: #2563eb;
+}
+
+#overview .date-picker-section .btn-success {
+    background-color: #10b981;
+    border: none;
+}
+
+#overview .date-picker-section .btn-success:hover {
+    background-color: #059669;
+}
+
+#overview .date-picker-section .btn-outline-secondary {
+    border-color: #cbd5e1;
+    color: #374151;
+}
+
+#overview .date-picker-section .btn-outline-secondary:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+
+        #overview .summary {
+            background: #d1fae5;
+            color: #065f46;
+            font-weight: 600;
+            font-size: 1rem;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 0 5px 0;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgb(0 0 0 / 0.04);
+        }
+
+        #overview .summary p {
+            margin: 6px 0;
+        }
+
+        #overview .card canvas {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 180px !important;
+            margin: 5px 0 0 0;
+            border-radius: 10px;
+            box-shadow: 0 5px 12px rgb(0 0 0 / 0.06);
+            display: block;
+        }
+
+        #overview .table-responsive {
+            overflow-x: auto;
+        }
+
+        #overview .table {
+            width: 100%;
+            margin-bottom: 0;
+        }
+
+        #overview .pagination {
+            margin-top: 10px;
+            justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+            #overview {
+                padding: 4px;
+                font-size: 12px;
+                width: 100%;
+                max-width: 100%;
+                overflow-x: hidden;
+            }
+
+            #overview h1 {
+                font-size: 1.3rem;
+                margin: 0 0 8px 0;
+            }
+
+            #overview h2 {
+                font-size: 1rem;
+                margin: 0 0 6px 0;
+            }
+
+            #overview .card {
+                margin: 0 0 6px 0;
+                padding: 6px;
+            }
+
+/* Group alignment */
+#overview .date-control-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px; /* spacing between date & buttons */
+}
+
+/* Date input normalization */
+#overview .date-control-group input[type="date"] {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    height: 12px !important;   /* force compact */
+    border-radius: 6px;
+}
+
+/* Button + Anchor unified compact style */
+#overview .date-control-group .date-btn,
+#overview .date-control-group a.date-btn {
+    display: inline-flex;               /* ensures text centers */
+    align-items: center;
+    justify-content: center;
+
+    height: 12px !important;            /* all same height */
+    padding: 0 12px !important;         /* remove vertical padding */
+    font-size: 12px !important;
+    font-weight: 600;
+    border-radius: 6px;
+    white-space: nowrap;
+
+    text-decoration: none !important;   /* remove underline */
+}
+
+/* Hover states */
+#overview .date-control-group .date-btn:hover,
+#overview .date-control-group a.date-btn:hover {
+    opacity: 0.9;
+    text-decoration: none !important;
+}
+
+
+            #overview .table {
+                font-size: 10px;
+                table-layout: fixed;
+                width: 100%;
+                max-width: 100%;
+                overflow-x: auto;
+                display: block;
+            }
+
+            #overview th, #overview td {
+                padding: 5px 6px;
+                font-size: 10px;
+                min-width: 0;
+                max-width: 100px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: normal;
+                word-break: break-word;
+                box-sizing: border-box;
+            }
+
+            #overview .sales-table th:nth-child(5),
+            #overview .sales-table td:nth-child(5),
+            #overview .expenses-table th:nth-child(3),
+            #overview .expenses-table td:nth-child(3),
+            #overview .stock-table th:nth-child(4),
+            #overview .stock-table td:nth-child(4),
+            #overview .defects-table th:nth-child(3),
+            #overview .defects-table td:nth-child(3),
+            #overview .defects-table th:nth-child(6),
+            #overview .defects-table td:nth-child(6) {
+                display: none;
+            }
+
+            #overview .sales-table th:nth-child(1),
+            #overview .sales-table td:nth-child(1) {
+                width: 40%;
+                max-width: 120px;
+            }
+
+            #overview .sales-table th:nth-child(2),
+            #overview .sales-table td:nth-child(2),
+            #overview .sales-table th:nth-child(3),
+            #overview .sales-table td:nth-child(3),
+            #overview .sales-table th:nth-child(4),
+            #overview .sales-table td:nth-child(4) {
+                width: 20%;
+                text-align: center;
+            }
+
+            #overview .expenses-table th:nth-child(1),
+            #overview .expenses-table td:nth-child(1) {
+                width: 60%;
+                max-width: 140px;
+            }
+
+            #overview .expenses-table th:nth-child(2),
+            #overview .expenses-table td:nth-child(2) {
+                width: 40%;
+                text-align: center;
+            }
+
+            #overview .stock-table th:nth-child(1),
+            #overview .stock-table td:nth-child(1) {
+                width: 50%;
+                max-width: 120px;
+            }
+
+            #overview .stock-table th:nth-child(2),
+            #overview .stock-table td:nth-child(2),
+            #overview .stock-table th:nth-child(3),
+            #overview .stock-table td:nth-child(3) {
+                width: 25%;
+                text-align: center;
+            }
+
+            #overview .defects-table th:nth-child(1),
+            #overview .defects-table td:nth-child(1) {
+                width: 40%;
+                max-width: 120px;
+            }
+
+            #overview .defects-table th:nth-child(2),
+            #overview .defects-table td:nth-child(2),
+            #overview .defects-table th:nth-child(4),
+            #overview .defects-table td:nth-child(4),
+            #overview .defects-table th:nth-child(5),
+            #overview .defects-table td:nth-child(5) {
+                width: 20%;
+                text-align: center;
+            }
+
+            #overview .summary {
+                padding: 6px;
+                font-size: 0.9rem;
+                margin: 0 0 6px 0;
+                max-width: 100%;
+            }
+
+            #overview .card canvas {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 140px !important;
+                margin: 6px 0 0 0;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #overview {
+                font-size: 11px;
+                padding: 3px;
+            }
+
+            #overview h1 {
+                font-size: 1.2rem;
+                margin: 0 0 6px 0;
+            }
+
+            #overview h2 {
+                font-size: 0.95rem;
+                margin: 0 0 4px 0;
+            }
+
+            #overview .card {
+                padding: 4px;
+                margin: 0 0 4px 0;
+            }
+
+            #overview .date-picker-section {
+                padding: 4px;
+                margin: 0 0 4px 0;
+            }
+
+            #overview .date-picker-section input[type="date"] {
+                padding: 4px;
+                margin: 0 0 4px 0;
+                font-size: 10px;
+                min-height: 36px;
+            }
+
+            #overview .date-picker-section button {
+                padding: 5px;
+                margin: 0 0 4px 0;
+                font-size: 10px;
+                min-height: 36px;
+            }
+
+            #overview .table {
+                margin: 0 0 4px 0;
+                font-size: 9px;
+            }
+
+            #overview th, #overview td {
+                padding: 4px 5px;
+                font-size: 9px;
+                max-width: 80px;
+            }
+
+            #overview .summary {
+                padding: 4px;
+                font-size: 0.85rem;
+                margin: 0 0 4px 0;
+            }
+
+            #overview .card canvas {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 120px !important;
+                margin: 4px 0 0 0;
+            }
+        }
+        /* Toolbar & Search */
+.products-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.search-container {
+    flex: 1;
+    max-width: 380px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 14px 10px 40px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: white url('data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27 viewBox=%270 0 16 16%27><path fill=%27%23666%27 d=%27M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z%27/></svg>') no-repeat 14px center;
+    background-size: 18px;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Sorting */
+.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+.sortable:hover {
+    background-color: #0056b3;
+}
+
+.sort-icon {
+    margin-left: 6px;
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+/* Active sort indicator */
+th.sorted-asc .sort-icon::after {
+    content: " ↑";
+}
+th.sorted-desc .sort-icon::after {
+    content: " ↓";
+}
+    </style>
+</head>
+<body>
+    <!-- Flash Messages -->
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">
+                        {{ message }}
+                        <span class="dismiss" onclick="this.parentElement.style.display='none'">✖</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Tabs -->
+    {% include 'admin_nav.html' %}
+
+    <!-- Daily Report (Overview) -->
+<div id="overview" class="tab-content {% if view == 'overview' or view == 'dashboard' or not view %}active{% endif %}">
+    {% if report_page %}
+    <h2 class="mt-4 text-center text-md-start">
+        Admin Report for {{ title_date or 'Today' }}
+    </h2>
+
+    {% if current_user.role == 'admin' %}
+    <!-- Range & Date Picker -->
+    <div class="date-picker-section mb-4">
+        <form method="GET" action="{{ url_for('admin.admin_dashboard') }}" class="d-flex flex-column flex-md-row gap-3 align-items-end">
+            <input type="hidden" name="view" value="overview">
+
+            <div>
+                <label for="range_type" class="form-label">Report Type</label>
+                <select name="range_type" id="range_type" class="form-select">
+                    <option value="daily" {% if range_type == 'daily' or not range_type %}selected{% endif %}>Daily</option>
+                    <option value="monthly" {% if range_type == 'monthly' %}selected{% endif %}>Monthly</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="selected_date" class="form-label">
+                    {% if range_type == 'monthly' %}Select Month{% else %}Select Date{% endif %}
+                </label>
+                <input type="date" id="selected_date" name="selected_date"
+                       value="{{ selected_date or '' }}" class="form-control"
+                       min="2020-01-01" max="2030-12-31">
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">View Report</button>
+                <button type="submit" name="action" value="export_pdf" class="btn btn-success">Export as PDF</button>
+                <a href="{{ url_for('admin.backfill_balances') }}" class="btn btn-sm btn-outline-light">🔄 Backfill Balances</a>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Cash Summary -->
+    <div class="row">
+        <!-- Column 1: Cash Inflow -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">💵 Cash In</div>
+                <div class="card-body summary">
+                    <p><strong>Opening Balance:</strong> ${{ "%.2f"|format(opening_balance) }}</p>
+                    <p><strong>Total Sales:</strong> ${{ "%.2f"|format(total_sales) }}</p>
+                    <p><strong>Total Extra Income:</strong> ${{ "%.2f"|format(total_income) }}</p>
+                    <p><strong>Gross Cash In:</strong> ${{ "%.2f"|format(total_sales + total_income) }}</p>
+                </div>
+            </div>
+        </div>
+        <!-- Column 2: Cash Outflow & Result -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">📉 Cash Out & Result</div>
+                <div class="card-body summary">
+                    <p><strong>Total Expenses:</strong> ${{ "%.2f"|format(total_expenses) }}</p>
+                    <p><strong>Total Profit:</strong> ${{ "%.2f"|format(total_profit) }}</p>
+                    <p><strong>Net Cash Flow:</strong> ${{ "%.2f"|format(net_cash_flow) }}</p>
+                    <p><strong>Closing Balance:</strong> ${{ "%.2f"|format(closing_balance) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row">
+        <!-- Sales, Expenses & Income Chart -->
+        <div class="col-md-6">
+            <div class="card mb-4 h-100">
+                <div class="card-header">
+                    📊 {{ 'Daily ' if range_type == 'monthly' else '' }}Sales, Expenses & Income Chart
+                </div>
+                <div class="card-body">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <!-- Net Profit Chart -->
+        <div class="col-md-6">
+            <div class="card mb-4 h-100">
+                <div class="card-header">
+                    📈 {{ 'Daily ' if range_type == 'monthly' else '' }}Net Profit Chart
+                </div>
+                <div class="card-body">
+                    <canvas id="profitChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SALES TABLE -->
+    <div class="card mb-4">
+        <div class="card-header">🧾 Sales</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped sales-table">
+                    <thead>
+                        <tr>
+                            <th>Receipt #</th>
+                            <th>Product</th>
+                            <th>Qty</th>
+                            <th>Total</th>
+                            <th>Profit</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in sales.items %}
+                        <tr>
+                            <td>{{ sale.receipt.receipt_number if sale.receipt else 'N/A' }}</td>
+                            <td>{{ sale.product.name if sale.product else 'Unknown Product' }}</td>
+                            <td>{{ sale.quantity }}</td>
+                            <td>${{ "%.2f"|format(sale.total_price) }}</td>
+                            <td>${{ "%.2f"|format(sale.profit) }}</td>
+                            <td>{{ sale.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6">No sales for this period.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if sales.has_prev or sales.has_next %}
+            <nav aria-label="Sales pagination">
+                <ul class="pagination">
+                    {% if sales.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.admin_dashboard', view='overview', page=sales.prev_num, selected_date=selected_date, range_type=range_type) }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    {% if sales.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.admin_dashboard', view='overview', page=sales.next_num, selected_date=selected_date, range_type=range_type) }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- EXPENSES TABLE -->
+    <div class="card mb-4">
+        <div class="card-header">💸 Expenses</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr><th>Description</th><th>Amount</th><th>Time</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in expenses.items %}
+                        <tr>
+                            <td>{{ expense.description }}</td>
+                            <td>${{ "%.2f"|format(expense.amount) }}</td>
+                            <td>{{ expense.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3">No expenses for this period.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- EXTRA INCOME TABLE -->
+    <div class="card mb-4">
+        <div class="card-header">💵 Extra Income</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr><th>Description</th><th>Amount</th><th>Time</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for i in incomes.items %}
+                        <tr>
+                            <td>{{ i.description }}</td>
+                            <td>${{ "%.2f"|format(i.amount) }}</td>
+                            <td>{{ i.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3">No extra income for this period.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- STOCK REQUESTS TABLE -->
+    <div class="card mb-4">
+        <div class="card-header">📦 Stock Requests</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr><th>Product</th><th>Qty</th><th>Action</th><th>Reason</th><th>Status</th><th>Time</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for req in stock_requests.items %}
+                        <tr>
+                            <td>{{ req.product.name if req.product else 'Unknown Product' }}</td>
+                            <td>{{ req.quantity }}</td>
+                            <td>{{ req.action or 'N/A' }}</td>
+                            <td>{{ req.reason or 'N/A' }}</td>
+                            <td>{{ req.status|capitalize }}</td>
+                            <td>{{ req.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6">No stock requests for this period.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEFECT REQUESTS TABLE -->
+    <div class="card mb-4">
+        <div class="card-header">⚠️ Defect Requests</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr><th>Product</th><th>Qty</th><th>Reason</th><th>Status</th><th>Time</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for d in defect_requests.items %}
+                        <tr>
+                            <td>{{ d.product.name if d.product else 'Unknown Product' }}</td>
+                            <td>{{ d.quantity }}</td>
+                            <td>{{ d.reason }}</td>
+                            <td>{{ d.status|capitalize }}</td>
+                            <td>{{ d.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5">No defect requests for this period.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+
+<!-- Products -->
+<div id="products" class="tab-content {% if view == 'products' %}active{% endif %}">
+    <h2>📦 Product Inventory</h2>
+
+    <div class="products-toolbar">
+        <div class="search-container">
+            <input type="text" id="productSearch" placeholder="🔍 Search by product name..." class="search-input">
+        </div>
+
+        <div class="download-buttons">
+            <a href="{{ url_for('admin.download_catalog') }}" class="btn btn-sm">Download Catalog</a>
+            <a href="{{ url_for('admin.download_stock_list') }}" class="btn btn-sm">Download Stock List</a>
+        </div>
+    </div>
+
+    {% if products %}
+    <table class="product-table" id="productTable">
+        <thead>
+            <tr>
+                <th>Image</th>
+                <th data-sort="name" class="sortable">Name <span class="sort-icon">↕</span></th>
+                <th data-sort="brand" class="sortable">Brand <span class="sort-icon">↕</span></th>
+                <th data-sort="category" class="sortable">Category <span class="sort-icon">↕</span></th>
+                <th data-sort="quantity" class="sortable">Qty <span class="sort-icon">↕</span></th>
+                <th data-sort="price" class="sortable">Price <span class="sort-icon">↕</span></th>
+                <th data-sort="cost" class="sortable">Cost <span class="sort-icon">↕</span></th>
+                <th data-sort="sold" class="sortable">Units Sold <span class="sort-icon">↕</span></th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in products %}
+            <tr id="product-{{ p.id }}">
+                <td>
+                    {% if p.image_filename %}
+                    <img src="{{ url_for('static', filename='uploads/' + p.image_filename) }}" alt="{{ p.name }}" class="product-img">
+                    {% else %}
+                    <div class="product-img placeholder">No Image</div>
+                    {% endif %}
+                </td>
+                <td class="product-name">{{ p.name }}</td>
+                <td>{{ p.brand }}</td>
+                <td>{{ p.category or '—' }}</td>
+                <td class="product-quantity">{{ p.quantity }}</td>
+                <td class="product-price">${{ "%.2f" | format(p.price) }}</td>
+                <td class="product-cost-price">${{ "%.2f" | format(p.cost_price) }}</td>
+                <td class="units-sold">
+                    {% set total_sold = p.sales | sum(attribute='quantity') | default(0) %}
+                    <strong>{{ total_sold }}</strong>
+                </td>
+                <td>
+                    <button class="btn edit-product-btn"
+                            data-id="{{ p.id }}"
+                            data-name="{{ p.name }}"
+                            data-price="{{ p.price }}"
+                            data-cost-price="{{ p.cost_price }}"
+                            data-quantity="{{ p.quantity }}">Edit</button>
+                    <form action="{{ url_for('admin.delete_product', product_id=p.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete {{ p.name }}?');">
+                        <button type="submit" class="btn danger-btn">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No products found.</p>
+    {% endif %}
+
+    <!-- Edit Product Modal -->
+    <div id="editProductModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Edit Product</h2>
+            <form id="editProductForm">
+                <input type="hidden" id="product_id" name="product_id">
+                <div class="form-group">
+                    <label for="name">Product Name</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Quantity</label>
+                    <input type="number" id="quantity" name="quantity" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="price">Selling Price</label>
+                    <input type="number" id="price" name="price" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="cost_price">Cost Price</label>
+                    <input type="number" id="cost_price" name="cost_price" step="0.01" min="0" required>
+                </div>
+                <button type="submit">Update Product</button>
+            </form>
+            <div id="editMessage" class="flash-messages"></div>
+        </div>
+    </div>
+</div>
+    <!-- Stock -->
+    <div id="stock" class="tab-content {% if view == 'stock' %}active{% endif %}">
+        <h2>Add to Existing Product</h2>
+        <form method="POST" action="{{ url_for('admin.add_stock') }}">
+            <input type="hidden" name="mode" value="existing">
+            <label for="product_id">Product:</label>
+            <select id="product_id" name="product_id">
+                {% for p in products %}
+                <option value="{{ p.id }}">{{ p.name }} (Qty: {{ p.quantity }})</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="quantity" min="1" required aria-describedby="stock-quantity-desc">
+            <small id="stock-quantity-desc" class="form-text text-muted">Enter the quantity to add.</small>
+            <button type="submit">Add</button>
+        </form>
+
+        <hr>
+
+        <h2>Add New Product</h2>
+        <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.add_stock') }}">
+            <input type="hidden" name="mode" value="new">
+            <input type="text" name="name" placeholder="Name" required autocorrect="off" autocapitalize="off" aria-describedby="new-name-desc">
+            <small id="new-name-desc" class="form-text text-muted">Enter the new product name.</small>
+            <input type="text" name="brand" placeholder="Brand" required autocorrect="off" autocapitalize="off" aria-describedby="brand-desc">
+            <small id="brand-desc" class="form-text text-muted">Enter the brand name.</small>
+            <input type="text" name="category" placeholder="Category" autocorrect="off" autocapitalize="off" aria-describedby="category-desc">
+            <small id="category-desc" class="form-text text-muted">Enter the category (optional).</small>
+            <input type="number" name="price" step="0.01" placeholder="Selling Price" required aria-describedby="new-price-desc">
+            <small id="new-price-desc" class="form-text text-muted">Enter the selling price.</small>
+            <input type="number" name="cost_price" step="0.01" placeholder="Cost Price" required aria-describedby="new-cost-price-desc">
+            <small id="new-cost-price-desc" class="form-text text-muted">Enter the cost price.</small>
+            <input type="number" name="quantity" placeholder="Quantity" required aria-describedby="new-quantity-desc">
+            <small id="new-quantity-desc" class="form-text text-muted">Enter the initial quantity.</small>
+            <input type="file" name="image" required aria-describedby="image-desc">
+            <small id="image-desc" class="form-text text-muted">Upload a product image.</small>
+            <button type="submit">Add Product</button>
+        </form>
+    </div>
+
+    <!-- Expenses -->
+    <div id="expenses" class="tab-content {% if view == 'expenses' %}active{% endif %}">
+        <h2>💸 Record Expense</h2>
+        <form method="POST" action="{{ url_for('admin.record_expense') }}">
+            <input type="text" name="description" placeholder="Description" required autocorrect="off" autocapitalize="off" aria-describedby="expense-desc">
+            <small id="expense-desc" class="form-text text-muted">Enter the expense description.</small>
+            <input type="number" name="amount" step="0.01" placeholder="Amount" required aria-describedby="expense-amount-desc">
+            <small id="expense-amount-desc" class="form-text text-muted">Enter the expense amount.</small>
+            <button type="submit">Save</button>
+        </form>
+    </div>
+
+    <!-- Combined Requests Tab -->
+    <div id="requests" class="tab-content {% if view in ['requests', 'defects'] %}active{% endif %}">
+        <!-- Stock Requests Section -->
+        <h2>🔧 Stock Requests</h2>
+        {% if view == 'requests' and stock_requests %}
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Action</th>
+                <th>Qty</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Time</th>
+                <th>Manage</th>
+            </tr>
+            {% for req in stock_requests %}
+            <tr>
+                <td>{{ req.product.name }}</td>
+                <td>{{ req.action }}</td>
+                <td>{{ req.quantity }}</td>
+                <td>{{ req.reason or '—' }}</td>
+                <td>{{ req.status|capitalize }}</td>
+                <td>{{ req.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                    {% if req.status == 'pending' %}
+                    <form method="POST" action="{{ url_for('admin.approve_stock_request', request_id=req.id) }}" style="display:inline;">
+                        <button onclick="return confirm('Approve this request?')" class="success-btn">✅</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin.reject_stock_request', request_id=req.id) }}" style="display:inline;">
+                        <button onclick="return confirm('Reject this request?')" class="danger-btn">❌</button>
+                    </form>
+                    {% else %}
+                    {{ req.status|capitalize }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% elif view == 'requests' %}
+        <p>No stock requests found.</p>
+        {% else %}
+        <p>Stock requests not loaded (viewing defect requests). <a href="{{ url_for('admin.admin_dashboard', view='requests') }}">View stock requests</a>.</p>
+        {% endif %}
+
+        <!-- Defect Requests Section -->
+        <h2>🛠️ Defect Requests</h2>
+
+        {% if view == 'defects' and defect_requests.items %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    <th>Submitted By</th>
+                    <th>Status</th>
+                    <th>Timestamp</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in defect_requests.items %}
+                <tr>
+                    <td>{{ r.id }}</td>
+                    <td>{{ r.product.name }}</td>
+                    <td>{{ r.quantity }}</td>
+                    <td>{{ r.submitted_user.email }}</td>
+                    <td>
+                        {% if r.status == 'Pending' %}
+                        <span class="danger">Pending</span>
+                        {% elif r.status == 'Approved' %}
+                        <span class="success">Approved</span>
+                        {% elif r.status == 'Returned' %}
+                        <span class="info">Returned</span>
+                        {% elif r.status == 'Rejected' %}
+                        <span class="danger">Rejected</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ r.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        {% if r.status == 'Pending' %}
+                        <form method="POST" action="{{ url_for('admin.approve_defect', request_id=r.id) }}" style="display:inline;">
+                            <button class="success-btn" onclick="return confirm('Approve this defect?')">✅ Approve</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin.reject_defect', request_id=r.id) }}" style="display:inline;">
+                            <button class="danger-btn" onclick="return confirm('Reject this defect?')">❌ Reject</button>
+                        </form>
+                        {% elif r.status == 'Approved' %}
+                        <form method="POST" action="{{ url_for('admin.return_defect', request_id=r.id) }}" style="display:inline;">
+                            <button class="info-btn" onclick="return confirm('Return this defect to stock?')">🔄 Return</button>
+                        </form>
+                        {% else %}
+                        <em>No actions available</em>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% elif view == 'defects' %}
+        <p>No defect requests for this date.</p>
+        {% else %}
+        <p>Defect requests not loaded (viewing stock requests). <a href="{{ url_for('admin.admin_dashboard', view='defects') }}">View defect requests</a>.</p>
+        {% endif %}
+    </div>
+
+    <!-- Quotations -->
+    <div id="quotations" class="tab-content container py-4 {% if view == 'quotations' %}active{% endif %}">
+        <h1>Quotation Management</h1>
+        <div class="flex-row">
+            <!-- Create Quotation -->
+            <div class="quote-box flex-child">
+                <h4>New Quotation</h4>
+                <form id="quotationForm" method="POST" action="{{ url_for('admin.quotations') }}">
+                    <div class="mb-2">
+                        <label for="customer_name" class="form-label">Customer Name</label>
+                        <input type="text" id="customer_name" name="customer_name" class="form-control form-control-sm" required autocorrect="off" autocapitalize="off" aria-describedby="customer-name-desc">
+                        <small id="customer-name-desc" class="form-text text-muted">Enter the customer name.</small>
+                    </div>
+                    <div id="items-container"></div>
+                    <button type="button" class="btn btn-sm btn-secondary my-2" onclick="addItemRow()">+ Add Item</button>
+                    <div class="mb-2">
+                        <label><strong>Grand Total:</strong> $<span id="grand-total">0.00</span></label>
+                    </div>
+                    <div class="mb-2">
+                        <label for="discount" class="form-label">Discount (%)</label>
+                        <input type="number" id="discount" name="discount" class="form-control form-control-sm" min="0" max="100" value="0" onchange="updateTotals()" aria-describedby="discount-desc">
+                        <small id="discount-desc" class="form-text text-muted">Enter discount percentage (0-100).</small>
+                    </div>
+                    <div class="mb-3">
+                        <label><strong>Total After Discount:</strong> $<span id="total-after-discount">0.00</span></label>
+                    </div>
+                    <input type="hidden" name="items" id="items-json">
+                    <input type="hidden" name="discount_value" id="discount_value">
+                    <button type="submit" class="btn btn-sm btn-primary">Create Quotation</button>
+                </form>
+            </div>
+            <!-- Quotation History -->
+            <div class="flex-child">
+                <h4>Quotation History</h4>
+                <div class="quote-box">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Customer</th>
+                                <th>Date</th>
+                                <th>Total</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for quote in quotations %}
+                            <tr>
+                                <td>{{ quote.quotation_number }}</td>
+                                <td>{{ quote.customer_name }}</td>
+                                <td>{{ quote.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>${{ '%.2f' % (quote.total_price or 0) }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-info" type="button" onclick="toggleDetails('details-{{ quote.id }}')">View</button>
+                                    <form action="{{ url_for('admin.convert_quotation', quotation_id=quote.id) }}" method="post" style="display:inline">
+                                        <button type="submit" class="btn btn-sm btn-success">Convert</button>
+                                    </form>
+                                    <a href="{{ url_for('admin.download_quotation', quotation_id=quote.id) }}" class="btn btn-sm btn-warning">PDF</a>
+                                </td>
+                            </tr>
+                            <tr id="details-{{ quote.id }}" class="quote-details">
+                                <td colspan="5">
+                                    <strong>Items:</strong>
+                                    <ul class="mb-0">
+                                        {% for item in quote.items %}
+                                        <li>{{ item.product_name }} — {{ item.quantity }} × ${{ '%.2f' % item.unit_price }} = ${{ '%.2f' % item.total_price }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // === Tab Switching ===
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            const tabId = this.getAttribute('data-tab');
+            if (tabId) {
+                e.preventDefault();
+                document.querySelectorAll('.nav-links a').forEach(l => l.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+                history.pushState({}, '', this.href);
+            }
+        });
+    });
+
+    // === Product Edit Modal ===
+    document.querySelectorAll('.edit-product-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const modal = document.getElementById('editProductModal');
+            const productId = this.getAttribute('data-id');
+            const name = this.getAttribute('data-name');
+            const price = this.getAttribute('data-price');
+            const costPrice = this.getAttribute('data-cost-price');
+            const quantity = this.getAttribute('data-quantity');
+
+            document.getElementById('product_id').value = productId;
+            document.getElementById('name').value = name;
+            document.getElementById('price').value = parseFloat(price).toFixed(2);
+            document.getElementById('cost_price').value = parseFloat(costPrice).toFixed(2);
+            document.getElementById('quantity').value = quantity;
+
+            modal.style.display = 'block';
+            modal.setAttribute('aria-hidden', 'false');
+        });
+    });
+
+    function closeEditModal() {
+        const modal = document.getElementById('editProductModal');
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        document.getElementById('editMessage').innerHTML = '';
+    }
+
+    document.querySelector('.modal .close').addEventListener('click', closeEditModal);
+
+    window.addEventListener('click', function(event) {
+        const modal = document.getElementById('editProductModal');
+        if (event.target === modal) closeEditModal();
+    });
+
+    // === Update Product Form ===
+    const editForm = document.getElementById('editProductForm');
+    if (editForm) {
+        editForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const productId = document.getElementById('product_id').value;
+            const data = {
+                name: document.getElementById('name').value.trim(),
+                price: parseFloat(document.getElementById('price').value) || 0,
+                cost_price: parseFloat(document.getElementById('cost_price').value) || 0,
+                quantity: parseInt(document.getElementById('quantity').value) || 0
+            };
+
+            const baseUrl = "{{ url_for('admin.edit_product', product_id=0) }}".replace('/0', '');
+            const editUrl = `${baseUrl}/${productId}`;
+
+            fetch(editUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                const msg = document.getElementById('editMessage');
+                if (data.success) {
+                    msg.innerHTML = `<div class="flash-message success">${data.message}</div>`;
+                    const row = document.getElementById(`product-${data.product.id}`);
+                    if (row) {
+                        row.querySelector('.product-name').textContent = data.product.name;
+                        row.querySelector('.product-price').textContent = `$${parseFloat(data.product.price).toFixed(2)}`;
+                        row.querySelector('.product-cost-price').textContent = `$${parseFloat(data.product.cost_price).toFixed(2)}`;
+                        row.querySelector('.product-quantity').textContent = data.product.quantity;
+
+                        const btn = row.querySelector('.edit-product-btn');
+                        btn.setAttribute('data-name', data.product.name);
+                        btn.setAttribute('data-price', data.product.price);
+                        btn.setAttribute('data-cost-price', data.product.cost_price);
+                        btn.setAttribute('data-quantity', data.product.quantity);
+                    }
+                    setTimeout(closeEditModal, 1800);
+                } else {
+                    msg.innerHTML = `<div class="flash-message danger">${data.message}</div>`;
+                }
+            })
+            .catch(() => {
+                document.getElementById('editMessage').innerHTML = `<div class="flash-message danger">Error updating product.</div>`;
+            });
+        });
+    }
+
+    // === Date Validation ===
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        input.addEventListener('change', function(e) {
+            const date = new Date(e.target.value);
+            const min = new Date('1970-01-01');
+            const max = new Date('2037-12-31');
+            if (isNaN(date) || date < min || date > max) {
+                alert('Please select a date between 1970 and 2037.');
+                e.target.value = '';
+            }
+        });
+    });
+
+    // === Charts ===
+  // === CHARTS (Fully Restored) ===
+    {% if (view == 'overview' or view == 'dashboard') and sales_data is defined and expenses_data is defined and income_data is defined and labels is defined %}
+    const salesData = {{ sales_data|default([])|tojson }};
+    const expensesData = {{ expenses_data|default([])|tojson }};
+    const incomeData = {{ income_data|default([])|tojson }};
+    const labels = {{ labels|default([])|tojson }};
+
+    // Combined Bar Chart
+    const ctxBar = document.getElementById('salesChart')?.getContext('2d');
+    if (ctxBar) {
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Sales', data: salesData, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 4, barPercentage: 0.6 },
+                    { label: 'Expenses', data: expensesData, backgroundColor: 'rgba(239, 68, 68, 0.8)', borderRadius: 4, barPercentage: 0.6 },
+                    { label: 'Extra Income', data: incomeData, backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4, barPercentage: 0.6 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top', labels: { font: { size: 12 } } } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Amount ($)' } },
+                    x: { ticks: { font: { size: 12 } } }
+                }
+            }
+        });
+    }
+
+    // Net Profit Line Chart
+    const profitData = salesData.map((s, i) => (s + incomeData[i]) - expensesData[i]);
+    const ctxProfit = document.getElementById('profitChart')?.getContext('2d');
+    if (ctxProfit) {
+        new Chart(ctxProfit, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Net Profit',
+                    data: profitData,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top', labels: { font: { size: 12 } } } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Net Profit ($)' } },
+                    x: { ticks: { font: { size: 12 } } }
+                }
+            }
+        });
+    }
+    {% endif %}
+
+    // === PRODUCT SEARCH & SORTING ===
+    const searchInput = document.getElementById('productSearch');
+    const productTable = document.getElementById('productTable');
+    const tbody = productTable ? productTable.querySelector('tbody') : null;
+
+    // Live Search
+    if (searchInput && tbody) {
+        searchInput.addEventListener('input', function() {
+            const term = this.value.toLowerCase().trim();
+            tbody.querySelectorAll('tr').forEach(row => {
+                const nameCell = row.querySelector('.product-name');
+                row.style.display = (nameCell && nameCell.textContent.toLowerCase().includes(term)) ? '' : 'none';
+            });
+        });
+    }
+
+    // Column Sorting
+    if (productTable && tbody) {
+        document.querySelectorAll('#productTable th[data-sort]').forEach(header => {
+            header.addEventListener('click', function() {
+                const sortKey = this.getAttribute('data-sort');
+                let rows = Array.from(tbody.querySelectorAll('tr'));
+
+                // Clear previous sort indicators
+                document.querySelectorAll('#productTable th').forEach(th => {
+                    th.classList.remove('sorted-asc', 'sorted-desc');
+                });
+
+                rows.sort((a, b) => {
+                    let valA, valB;
+                    switch(sortKey) {
+                        case 'name':
+                            valA = a.querySelector('.product-name').textContent.trim();
+                            valB = b.querySelector('.product-name').textContent.trim();
+                            return valA.localeCompare(valB);
+                        case 'brand':
+                            valA = a.cells[2].textContent.trim();
+                            valB = b.cells[2].textContent.trim();
+                            return valA.localeCompare(valB);
+                        case 'category':
+                            valA = a.cells[3].textContent.trim();
+                            valB = b.cells[3].textContent.trim();
+                            return valA.localeCompare(valB);
+                        case 'quantity':
+                            valA = parseFloat(a.querySelector('.product-quantity').textContent) || 0;
+                            valB = parseFloat(b.querySelector('.product-quantity').textContent) || 0;
+                            return valA - valB;
+                        case 'price':
+                            valA = parseFloat(a.querySelector('.product-price').textContent.replace('$','')) || 0;
+                            valB = parseFloat(b.querySelector('.product-price').textContent.replace('$','')) || 0;
+                            return valA - valB;
+                        case 'cost':
+                            valA = parseFloat(a.querySelector('.product-cost-price').textContent.replace('$','')) || 0;
+                            valB = parseFloat(b.querySelector('.product-cost-price').textContent.replace('$','')) || 0;
+                            return valA - valB;
+                        case 'sold':
+                            valA = parseFloat(a.querySelector('.units-sold strong').textContent) || 0;
+                            valB = parseFloat(b.querySelector('.units-sold strong').textContent) || 0;
+                            return valA - valB;
+                    }
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+                this.classList.add('sorted-asc');
+            });
+        });
+    }
+
+    // === Quotation Scripts ===
+    window.addItemRow = function() {
+        const container = document.getElementById('items-container');
+        if (!container) return;
+
+        const row = document.createElement('div');
+        row.classList.add('row', 'custom-product-entry', 'align-items-center', 'mb-1');
+        row.innerHTML = `
+            <div class="col-md-5">
+                <select class="form-select form-select-sm product-name" onchange="fillProductPrice(this)" required>
+                    <option value="">-- Select Product or Enter Custom --</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}" data-price="{{ p.price }}" data-name="{{ p.name }}">{{ p.name }}</option>
+                    {% endfor %}
+                    <option value="__custom__">-- Custom Product --</option>
+                </select>
+                <input type="text" placeholder="Custom Product Name" class="form-control form-control-sm product-custom d-none mt-1">
+            </div>
+            <div class="col-md-2">
+                <input type="number" placeholder="Qty" class="form-control form-control-sm product-quantity" value="1" min="1" onchange="updateTotals()" required>
+            </div>
+            <div class="col-md-2">
+                <input type="number" placeholder="Price" class="form-control form-control-sm product-price" min="0" step="0.01" onchange="updateTotals()" required>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.custom-product-entry').remove(); updateTotals();">Remove</button>
+            </div>`;
+        container.appendChild(row);
+    };
+
+    window.fillProductPrice = function(selectEl) {
+        const row = selectEl.closest('.custom-product-entry');
+        const priceInput = row.querySelector('.product-price');
+        const customInput = row.querySelector('.product-custom');
+        if (selectEl.value === '__custom__') {
+            customInput.classList.remove('d-none');
+            priceInput.value = '';
+        } else {
+            customInput.classList.add('d-none');
+            const price = selectEl.options[selectEl.selectedIndex].getAttribute('data-price');
+            priceInput.value = price || '0.00';
+        }
+        updateTotals();
+    };
+
+    window.updateTotals = function() {
+        const container = document.getElementById('items-container');
+        let total = 0;
+        container.querySelectorAll('.custom-product-entry').forEach(row => {
+            const qty = parseFloat(row.querySelector('.product-quantity').value) || 0;
+            const price = parseFloat(row.querySelector('.product-price').value) || 0;
+            total += qty * price;
+        });
+        document.getElementById('grand-total').textContent = total.toFixed(2);
+        const discount = parseFloat(document.getElementById('discount').value) || 0;
+        let final = total - discount;
+        if (final < 0) final = 0;
+        document.getElementById('total-after-discount').textContent = final.toFixed(2);
+    };
+
+    // Initialize quotation if on that tab
+    if (document.getElementById('items-container') && document.querySelectorAll('.custom-product-entry').length === 0) {
+        addItemRow();
+        updateTotals();
+    }
+
+    // Format prices
+    document.querySelectorAll('.product-price, .product-cost-price').forEach(cell => {
+        const val = parseFloat(cell.textContent.replace('$', ''));
+        if (!isNaN(val)) {
+            cell.textContent = '$' + (Number.isInteger(val) ? val : val.toFixed(2));
+        }
+    });
+
+});
+</script>
+</body>
+</html>

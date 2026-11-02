@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Inventory</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f7f7f7;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 {
+            color: #007bff;
+        }
+        .product-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #eee;
+        }
+        .product-img {
+            width: 50px;
+            height: auto;
+            vertical-align: middle;
+        }
+        .low-stock {
+            color: red;
+            font-weight: bold;
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash-message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            position: relative;
+            background: #f0f0f0;
+        }
+        .flash-message.success {
+            background: #e6ffe6;
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+        .flash-message.danger {
+            background: #ffe6e6;
+            border: 1px solid #dc3545;
+            color: #dc3545;
+        }
+        .flash-message.info {
+            background: #e6f3ff;
+            border: 1px solid #007bff;
+            color: #007bff;
+        }
+        .flash-message.warning {
+            background: #fff3e6;
+            border: 1px solid #ffc107;
+            color: #ffc107;
+        }
+        .flash-message .dismiss {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+    <script>
+        // Debounce function to limit filterTable calls
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        function filterTable() {
+            let input = document.getElementById("searchInput").value.toLowerCase();
+            let rows = document.querySelectorAll("#productTable tbody tr");
+            rows.forEach(row => {
+                let name = row.cells[1].innerText.toLowerCase();
+                row.style.display = name.includes(input) ? "" : "none";
+            });
+        }
+
+        // Apply debounce to filterTable (200ms delay)
+        const debouncedFilterTable = debounce(filterTable, 200);
+
+        // Auto-dismiss flash messages after 5 seconds
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                document.querySelectorAll('.flash-message').forEach(msg => {
+                    msg.style.display = 'none';
+                });
+            }, 5000);
+        });
+    </script>
+</head>
+<body>
+{% include "cashier_base.html" %}
+
+<!-- Flash Messages -->
+<div class="flash-messages">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message {{ category }}">
+                    {{ message }}
+                    <span class="dismiss" onclick="this.parentElement.style.display='none'">✖</span>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+
+<h2>📦 Product Inventory</h2>
+<input type="text" id="searchInput" onkeyup="debouncedFilterTable()" placeholder="Search product by name...">
+{% if products %}
+<table id="productTable" class="product-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Qty</th>
+            <th>Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in products %}
+        <tr id="product-{{ p.id }}">
+            <td class="product-name">{{ p.name }}</td>
+            <td class="product-quantity {% if p.quantity < 5 %}low-stock{% endif %}">{{ p.quantity }}</td>
+            <td class="product-price">${{ "%.2f" | format(p.price) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <p>No products found.</p>
+{% endif %}
+</body>
+</html>

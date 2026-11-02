@@ -1,0 +1,108 @@
+{% extends 'shop/base.html' %}
+{% block title %}Order {{ order.order_number }} | {{ biz.name }}{% endblock %}
+{% block content %}
+{% set stage = {'pending_payment': 0, 'reserved': 0, 'paid': 1, 'ready': 2, 'completed': 3}.get(order.status, 0) %}
+<div class="wrap page">
+  <div class="section-head">
+    <div>
+      <h1 style="font-size:2rem;margin-bottom:4px">Order {{ order.order_number }}</h1>
+      <span class="muted small">Placed {{ order.created_at|when }}</span>
+    </div>
+    <span class="badge {{ 'badge-ok' if order.status in ('paid','ready','completed') else ('badge-bad' if order.status == 'cancelled' else 'badge-warn') }}">{{ order.status_label }}</span>
+  </div>
+
+  {% if order.status == 'cancelled' %}
+    <div class="flash flash-danger" style="margin-bottom:20px">This order was cancelled and the items have gone back into stock.{% if order.payment_status == 'refunded' %} Your payment has been refunded.{% endif %}</div>
+  {% else %}
+  <ol class="status" aria-label="Order progress">
+    {% for label in ['Placed', 'Paid', 'Ready', 'Completed'] %}
+      <li class="{{ 'done' if loop.index0 < stage else '' }} {{ 'now' if loop.index0 == stage else '' }}">{{ label }}</li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+
+  <div class="two-col">
+    <div>
+      {% if can_pay %}
+      <section class="panel" style="border-color:var(--gold)">
+        <h2>Complete your payment</h2>
+        <p class="muted">We're holding your items until {{ order.expires_at|when('%H:%M') }}. Pay now to secure them.</p>
+        <div class="actions">
+          {% if paynow_on %}
+          <form method="post" action="{{ url_for('shop.pay_again', order_number=order.order_number, provider='paynow') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="t" value="{{ token }}">
+            <button class="btn {{ 'btn-gold' if order.payment_method == 'paynow' else 'btn-ghost' }}" type="submit">Pay with Paynow</button>
+          </form>
+          {% endif %}
+          {% if paypal_on %}
+          <form method="post" action="{{ url_for('shop.pay_again', order_number=order.order_number, provider='paypal') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="t" value="{{ token }}">
+            <button class="btn {{ 'btn-gold' if order.payment_method == 'paypal' else 'btn-ghost' }}" type="submit">Pay with PayPal</button>
+          </form>
+          {% endif %}
+          {% if order.payments %}
+          <form method="post" action="{{ url_for('shop.check_payment', order_number=order.order_number) }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="t" value="{{ token }}">
+            <button class="btn btn-ghost" type="submit">I've paid - check status</button>
+          </form>
+          {% endif %}
+        </div>
+      </section>
+      {% elif order.status == 'reserved' %}
+      <section class="panel" style="border-color:var(--gold)">
+        <h2>Your items are reserved</h2>
+        <p class="muted" style="margin:0">Pay when you collect from {{ biz.address }}. We'll hold them until {{ order.expires_at|when }}.</p>
+      </section>
+      {% elif order.payment_status == 'paid' %}
+      <section class="panel">
+        <h2>Payment received</h2>
+        <p class="muted">Thank you. {% if order.status == 'paid' %}We will let you know when your order is ready.{% endif %}</p>
+        <a class="btn btn-ghost" href="{{ url_for('shop.order_receipt', order_number=order.order_number, t=token) }}">Download receipt (PDF)</a>
+      </section>
+      {% endif %}
+
+      <section class="panel">
+        <h2>Items</h2>
+        {% for i in order.items %}
+        <div class="line" style="grid-template-columns:1fr auto">
+          <div><div class="line-title">{{ i.product_name.split('|')[0][:90] }}</div><div class="muted small">{{ i.quantity }} &times; {{ i.unit_price|money }}</div></div>
+          <div class="num">{{ i.line_total|money }}</div>
+        </div>
+        {% endfor %}
+        <div class="totals">
+          <div><span>Subtotal</span><span class="num">{{ order.subtotal|money }}</span></div>
+          {% if order.delivery_fee %}<div><span>Delivery</span><span class="num">{{ order.delivery_fee|money }}</span></div>{% endif %}
+          <div class="grand"><span>Total</span><span class="num">{{ order.total|money }}</span></div>
+        </div>
+      </section>
+    </div>
+
+    <aside>
+      <section class="panel">
+        <h3>Your details</h3>
+        <dl class="kv small">
+          <dt>Name</dt><dd>{{ order.customer_name }}</dd>
+          <dt>Phone</dt><dd>{{ order.customer_phone }}</dd>
+          <dt>Email</dt><dd>{{ order.customer_email }}</dd>
+          <dt>{{ 'Delivery to' if order.delivery_method == 'delivery' else 'Collect from' }}</dt><dd>{{ order.delivery_address if order.delivery_method == 'delivery' else biz.address }}</dd>
+          <dt>Payment</dt><dd>{{ {'paynow': 'Paynow', 'paypal': 'PayPal', 'pay_at_shop': 'At the shop', 'manual': 'Recorded by staff'}.get(order.payment_method, '-') }} ({{ 'paid' if order.payment_status == 'paid' else 'not paid yet' }})</dd>
+        </dl>
+      </section>
+      <section class="panel">
+        <h3>Need help?</h3>
+        <p class="small muted">Quote order {{ order.order_number }}.</p>
+        <div class="actions">
+          {% if biz.whatsapp %}<a class="btn btn-ghost btn-sm" href="https://wa.me/{{ biz.whatsapp }}?text={{ ('Hi, about order ' ~ order.order_number)|urlencode }}">WhatsApp us</a>{% endif %}
+          {% if biz.phone %}<a class="btn btn-ghost btn-sm" href="tel:{{ biz.phone }}">Call {{ biz.phone }}</a>{% endif %}
+        </div>
+        {% if order.status in ('pending_payment', 'reserved') and order.payment_status != 'paid' %}
+        <form method="post" action="{{ url_for('shop.order_cancel', order_number=order.order_number) }}" style="margin-top:14px" onsubmit="return confirm('Cancel this order?')">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="t" value="{{ token }}">
+          <button class="link-btn" type="submit">Cancel this order</button>
+        </form>
+        {% endif %}
+      </section>
+    </aside>
+  </div>
+</div>
+{% endblock %}

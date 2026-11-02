@@ -1,0 +1,16 @@
+{% extends 'shop/base.html' %}
+{% block title %}Create an account | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap"><div class="panel auth-card">
+  <h1 style="font-size:1.7rem">Create an account</h1>
+  <p class="muted">Keep your orders in one place. You can still check out without one.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="name">Full name</label><input id="name" name="name" autocomplete="name" required></div>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" name="email" autocomplete="username" required></div>
+    <div class="field"><label for="password">Password</label><input id="password" type="password" name="password" autocomplete="new-password" minlength="8" required><div class="hint">At least 8 characters.</div></div>
+    <button class="btn btn-gold btn-block" type="submit">Create account</button>
+  </form>
+  <p class="small" style="margin:16px 0 0">Already registered? <a href="{{ url_for('shop.account_login') }}">Sign in</a></p>
+</div></div>
+{% endblock %}

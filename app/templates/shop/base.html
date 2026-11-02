@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ biz.name }}{% endblock %}</title>
+  <meta name="description" content="{% block desc %}Laptops, phones and accessories from {{ biz.name }}. Order online and pay with Paynow or PayPal, or reserve and pay at the shop.{% endblock %}">
+  <link rel="icon" href="{{ url_for('static', filename='images/cth_mark.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+{% block header %}
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="brand" href="{{ url_for('shop.home') }}">
+      <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="42" height="42">
+      <span>{{ biz.name }}</span>
+    </a>
+    <form class="head-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
+      <input type="search" name="q" value="{{ q|default('') }}" placeholder="Search laptops, phones, accessories" aria-label="Search products">
+      <button class="btn" type="submit">Search</button>
+    </form>
+    <nav class="head-nav" aria-label="Main">
+      <a href="{{ url_for('shop.catalog') }}" {% if request.endpoint in ('shop.catalog','shop.product') %}aria-current="page"{% endif %}>Shop</a>
+      <a class="hide-sm" href="{{ url_for('shop.track') }}">Track order</a>
+      {% if current_user.is_authenticated %}
+        {% if current_user.role == 'customer' %}
+          <a href="{{ url_for('shop.account') }}">My orders</a>
+        {% else %}
+          <a href="{{ url_for('shop.account') }}">Staff area</a>
+        {% endif %}
+      {% else %}
+        <a href="{{ url_for('shop.account_login') }}">Sign in</a>
+      {% endif %}
+      <a class="cart-link" href="{{ url_for('shop.cart') }}" {% if request.endpoint == 'shop.cart' %}aria-current="page"{% endif %}>Cart <span class="cart-count" aria-label="{{ cart_count }} items">{{ cart_count }}</span></a>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+<main id="main">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="wrap flashes" role="status">
+        {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+
+{% block footer %}
+<footer class="site-foot">
+  <div class="wrap foot-grid">
+    <div>
+      <h3>{{ biz.name }}</h3>
+      <p>{{ biz.address }}</p>
+      {% if biz.phone %}<p>Call {{ biz.phone }}</p>{% endif %}
+      {% if biz.email %}<p><a href="mailto:{{ biz.email }}">{{ biz.email }}</a></p>{% endif %}
+      {% if biz.whatsapp %}<p><a href="https://wa.me/{{ biz.whatsapp }}">Chat on WhatsApp</a></p>{% endif %}
+    </div>
+    <div>
+      <h3>Shop</h3>
+      <p><a href="{{ url_for('shop.catalog') }}">All products</a></p>
+      <p><a href="{{ url_for('shop.track') }}">Track an order</a></p>
+      <p><a href="{{ url_for('shop.cart') }}">Your cart</a></p>
+    </div>
+    <div>
+      <h3>Payments</h3>
+      <p>Paynow, PayPal, or pay at the shop when you collect.</p>
+      <p class="small"><a href="{{ url_for('auth.login') }}">Staff sign in</a></p>
+    </div>
+  </div>
+  <div class="wrap small" style="margin-top:22px;color:#8d98a3">&copy; {{ current_year }} {{ biz.name }}</div>
+</footer>
+{% endblock %}
+</body>
+</html>

@@ -1,0 +1,14 @@
+{% extends 'shop/base.html' %}
+{% block title %}Track your order | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap"><div class="panel auth-card">
+  <h1 style="font-size:1.7rem">Track your order</h1>
+  <p class="muted">Enter the order number from your confirmation and the email you used.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="on">Order number</label><input id="on" name="order_number" placeholder="CTH-ABC123" autocapitalize="characters" required></div>
+    <div class="field"><label for="em">Email</label><input id="em" type="email" name="email" required></div>
+    <button class="btn btn-gold btn-block" type="submit">Find my order</button>
+  </form>
+</div></div>
+{% endblock %}

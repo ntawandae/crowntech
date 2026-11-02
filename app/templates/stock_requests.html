@@ -1,0 +1,45 @@
+<!-- templates/stock_requests.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Requests</title>
+</head>
+<body>
+    <h2>🔧 Stock Requests</h2>
+     {% include 'admin_nav.html' %}
+
+    <hr>
+    {% if stock_requests %}
+    <table border="1" cellpadding="8">
+        <tr>
+            <th>Product</th><th>Action</th><th>Qty</th><th>Reason</th><th>Status</th><th>By</th><th>Time</th><th>Manage</th>
+        </tr>
+        {% for req in stock_requests %}
+        <tr>
+            <td>{{ req.product.name }}</td>
+            <td>{{ req.action }}</td>
+            <td>{{ req.quantity }}</td>
+            <td>{{ req.reason or '—' }}</td>
+            <td>{{ req.status }}</td>
+            <td>{{ req.requested_by }}</td>
+            <td>{{ req.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                {% if req.status == 'pending' %}
+                    <form method="post" action="{{ url_for('admin.handle_stock_request', request_id=req.id, action='approve') }}" style="display:inline;">
+                        <button style="color:green;">✅</button>
+                    </form>
+                    <form method="post" action="{{ url_for('admin.handle_stock_request', request_id=req.id, action='reject') }}" style="display:inline;">
+                        <button style="color:red;">❌</button>
+                    </form>
+                {% else %}
+                    {{ req.status|capitalize }}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+        <p>No stock requests found.</p>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Orders{% endblock %} | {{ biz.name }} staff</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/cth_mark.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
+</head>
+<body>
+<header class="staff-head">
+  <div class="wrap head-row">
+    <a class="brand" href="{{ url_for('staff_orders.order_list') }}"><img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="36" height="36" style="width:36px;height:36px;border-radius:6px"><span>{{ biz.name }} staff</span></a>
+    <nav class="head-nav" aria-label="Staff">
+      <a href="{{ url_for('staff_orders.order_list') }}" aria-current="page">Online orders{% if staff_pending_orders %} <span class="cart-count" style="background:var(--gold);color:var(--on-gold)">{{ staff_pending_orders }}</span>{% endif %}</a>
+      {% if current_user.role == 'admin' %}<a href="{{ url_for('admin.admin_dashboard') }}">Admin dashboard</a>
+      {% else %}<a href="{{ url_for('cashier.cashier_dashboard') }}">Till</a>{% endif %}
+      <a href="{{ url_for('shop.home') }}" target="_blank" rel="noopener">View shop</a>
+      <a href="{{ url_for('auth.logout') }}">Sign out</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap page">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}<div class="flashes" style="margin:0 0 18px" role="status">{% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no">
+    {% include "admin_nav.html" %}
+    <title>Admin Quotations</title>
+    <style>
+        html, body {
+            font-family: Arial, sans-serif;
+            background: #f7f7f7;
+            margin: 0;
+            padding: 4px;
+            font-size: 16px;
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        h2 {
+            color: #343a40;
+            margin: 15px 0 10px 0;
+            font-size: 1.5rem;
+        }
+        .quotation-form, .quotation-history {
+            background: #fff;
+            padding: 15px;
+            margin: 10px auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            max-width: 1200px;
+            width: 100%;
+            overflow-x: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            table-layout: fixed;
+        }
+        th, td {
+            padding: 10px 12px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+            font-size: 0.9rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        th {
+            background: #007bff;
+            color: #fff;
+            font-weight: 500;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        #itemsTable th:nth-child(1), #itemsTable td:nth-child(1) { width: 200px;white-space: wrap; }
+        #itemsTable th:nth-child(2), #itemsTable td:nth-child(2) { width: 80px; }
+        #itemsTable th:nth-child(3), #itemsTable td:nth-child(3) { width: 100px; }
+        #itemsTable th:nth-child(4), #itemsTable td:nth-child(4) { width: 100px; }
+        #itemsTable th:nth-child(5), #itemsTable td:nth-child(5) { width: 100px; }
+        .quotation-history th:nth-child(1), .quotation-history td:nth-child(1) { width: 80px; }
+        .quotation-history th:nth-child(2), .quotation-history td:nth-child(2) { width: 140px; }
+        .quotation-history th:nth-child(3), .quotation-history td:nth-child(3) { width: 100px; }
+        .quotation-history th:nth-child(4), .quotation-history td:nth-child(4) { width: 80px; }
+        .quotation-history th:nth-child(5), .quotation-history td:nth-child(5) { width: 140px; overflow: visible; }
+        .actions {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 4px;
+            align-items: center;
+        }
+        select, input[type="number"], input[type="text"] {
+            padding: 8px;
+            margin: 6px 5px 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button, .btn-group button {
+            display: inline-block;
+            width: auto;
+            padding: 8px 12px;
+            margin: 0 5px 8px 0;
+            border: none;
+            border-radius: 6px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 0.95rem;
+            min-height: 36px;
+            transition: background-color 0.3s ease;
+            touch-action: manipulation;
+        }
+        button:hover:not([disabled]) {
+            background: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .actions button, .actions a button {
+            padding: 6px;
+            font-size: 0.9rem;
+            min-height: 28px;
+            min-width: 28px;
+        }
+        .actions .convert-button {
+            padding: 6px 10px;
+        }
+        .flash-message {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 0 auto 10px auto;
+            width: 100%;
+            max-width: 1200px;
+        }
+        @media (max-width: 768px) {
+            html, body { padding: 4px; font-size: 14px; width: 100vw; overflow-x: hidden; }
+            h2 { font-size: 1.2rem; margin: 10px 0 6px 0; }
+            .quotation-form, .quotation-history { padding: 10px; margin: 6px 0; max-width: 100%; overflow-x: hidden; }
+            table { margin: 6px 0; }
+            th, td { padding: 6px 8px; font-size: 0.8rem; }
+            #itemsTable th:nth-child(1), #itemsTable td:nth-child(1) { width: 120px; }
+            #itemsTable th:nth-child(2), #itemsTable td:nth-child(2) { width: 60px; }
+            #itemsTable th:nth-child(3), #itemsTable td:nth-child(3) { width: 80px; }
+            #itemsTable th:nth-child(4), #itemsTable td:nth-child(4) { width: 80px; }
+            #itemsTable th:nth-child(5), #itemsTable td:nth-child(5) { width: 80px; }
+            .quotation-history th:nth-child(1), .quotation-history td:nth-child(1) { width: 60px; }
+            .quotation-history th:nth-child(2), .quotation-history td:nth-child(2) { width: 90px; }
+            .quotation-history th:nth-child(3), .quotation-history td:nth-child(3) { width: 80px; }
+            .quotation-history th:nth-child(4), .quotation-history td:nth-child(4) { width: 60px; }
+            .quotation-history th:nth-child(5), .quotation-history td:nth-child(5) { width: 130px; overflow: visible; }
+            .actions button, .actions a button { padding: 4px; font-size: 0.85rem; min-height: 24px; min-width: 24px; }
+            .actions .convert-button { padding: 4px 8px; }
+            select, input[type="number"], input[type="text"] { width: 100%; max-width: 100%; padding: 6px; margin: 0 0 6px 0; font-size: 16px; }
+            button, .btn-group button { width: auto; padding: 4px 10px; margin: 0 4px 6px 0; font-size: 0.9rem; min-height: 32px; }
+            .flash-message { padding: 6px; margin: 0 0 6px 0; max-width: 100%; }
+        }
+        @media (max-width: 480px) {
+            html, body { padding: 3px; font-size: 13px; }
+            h2 { font-size: 1.1rem; margin: 8px 0 4px 0; }
+            .quotation-form, .quotation-history { padding: 8px; margin: 4px 0; }
+            table { margin: 4px 0; }
+            th, td { padding: 4px 6px; font-size: 0.75rem; }
+            #itemsTable th:nth-child(1), #itemsTable td:nth-child(1) { width: 100px; }
+            #itemsTable th:nth-child(2), #itemsTable td:nth-child(2) { width: 50px; }
+            #itemsTable th:nth-child(3), #itemsTable td:nth-child(3) { width: 70px; }
+            #itemsTable th:nth-child(4), #itemsTable td:nth-child(4) { width: 70px; }
+            #itemsTable th:nth-child(5), #itemsTable td:nth-child(5) { width: 70px; }
+            .quotation-history th:nth-child(1), .quotation-history td:nth-child(1) { width: 50px; }
+            .quotation-history th:nth-child(2), .quotation-history td:nth-child(2) { width: 70px; }
+            .quotation-history th:nth-child(3), .quotation-history td:nth-child(3) { width: 70px; }
+            .quotation-history th:nth-child(4), .quotation-history td:nth-child(4) { width: 50px; }
+            .quotation-history th:nth-child(5), .quotation-history td:nth-child(5) { width: 110px; overflow: visible; }
+            .actions button, .actions a button { padding: 3px; font-size: 0.8rem; min-height: 24px; min-width: 24px; }
+            .actions .convert-button { padding: 3px 6px; }
+            select, input[type="number"], input[type="text"] { padding: 5px; margin: 0 0 5px 0; font-size: 16px; }
+            button, .btn-group button { padding: 5px 8px; margin: 0 3px 4px 0; font-size: 0.85rem; min-height: 30px; }
+            .flash-message { padding: 5px; margin: 0 0 4px 0; }
+        }
+    </style>
+</head>
+<body>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div>
+      {% for category, message in messages %}
+        <div class="flash-message"
+             style="background-color: {% if category == 'danger' %}#f8d7da{% elif category == 'warning' %}#fff3cd{% elif category == 'success' %}#d4edda{% else %}#cce5ff{% endif %};
+                    color: {% if category == 'danger' %}#721c24{% elif category == 'warning' %}#856404{% elif category == 'success' %}#155724{% else %}#004085{% endif %};
+                    border: 1px solid {% if category == 'danger' %}#f5c6cb{% elif category == 'warning' %}#ffeeba{% elif category == 'success' %}#c3e6cb{% else %}#b8daff{% endif %};">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<h2>{{ 'Edit Quotation' if edit_quotation else 'New Quotation' }}</h2>
+<div class="quotation-form">
+    <form method="POST" id="quotationForm" action="{% if edit_quotation %}{{ url_for('admin.edit_quotation', quotation_id=edit_quotation.id) }}{% else %}{{ url_for('admin.quotations') }}{% endif %}">
+        <label>Customer Name:</label>
+        <input type="text" name="customer_name" required value="{{ edit_quotation.customer_name if edit_quotation else '' }}" {% if edit_quotation and edit_quotation.converted %}disabled{% endif %} onblur="resetViewport()">
+
+        <label>Select Product:</label>
+        <select id="productSelect" {% if edit_quotation and edit_quotation.converted %}disabled{% endif %}>
+            <option value="">-- Select Product --</option>
+            {% for product in products %}
+                <option value="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}">
+                    {{ product.name }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <label>Qty:</label>
+        <input type="number" id="qty" value="1" min="1" {% if edit_quotation and edit_quotation.converted %}disabled{% endif %}>
+        <button type="button" onclick="addItem()" {% if edit_quotation and edit_quotation.converted %}disabled{% endif %}>Add Item</button>
+
+        <table id="itemsTable">
+            <thead>
+                <tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Action</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <label>Discount (%):</label>
+        <input type="number" name="discount_value" id="discount_value" step="0.01" min="0" max="100" value="{{ edit_quotation.discount if edit_quotation else 0 }}" {% if edit_quotation and edit_quotation.converted %}disabled{% endif %} onchange="updateTable()">
+
+        <input type="hidden" name="items" id="itemsInput">
+        <button type="submit" {% if edit_quotation and edit_quotation.converted %}disabled{% endif %}>
+            {{ 'Update Quotation' if edit_quotation else 'Save Quotation' }}
+        </button>
+        {% if edit_quotation %}
+        <button type="button" onclick="window.location.href='{{ url_for('admin.quotations') }}'">Cancel</button>
+        {% endif %}
+    </form>
+</div>
+
+<h2>Quotation History</h2>
+<div class="quotation-history">
+    <table>
+        <thead>
+            <tr><th>#</th><th>Customer</th><th>Date</th><th>Total</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for q in quotations %}
+            <tr>
+                <td>{{ q.quotation_number }}</td>
+                <td>{{ q.customer_name }}</td>
+                <td>{{ q.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>$ {{ '%.2f' % (q.total_price - q.discount) }}</td>
+                <td class="actions">
+                    <a href="{{ url_for('admin.download_quotation', quotation_id=q.id) }}" target="_blank">
+                        <button title="Download">↓</button>
+                    </a>
+                    <form method="POST" action="{{ url_for('admin.convert_quotation', quotation_id=q.id) }}" style="display:inline;">
+                        <button class="convert-button" type="submit" {% if q.converted %}disabled{% endif %} title="{{ 'Converted' if q.converted else 'Convert to Sale' }}">
+                            {{ 'Converted' if q.converted else 'Convert' }}
+                        </button>
+                    </form>
+                    <a href="{{ url_for('admin.edit_quotation', quotation_id=q.id) }}">
+                        <button title="Edit" {% if q.converted %}disabled{% endif %}>✎</button>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    let items = [];
+
+    {% if edit_quotation %}
+    items = [
+        {% for item in edit_quotation.items %}
+        {
+            product_id: {{ item.product_id or 'null' }},
+            product_name: "{{ item.product_name|e }}",
+            quantity: {{ item.quantity }},
+            unit_price: {{ item.unit_price }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    updateTable();
+    {% endif %}
+
+    function addItem() {
+        const productSelect = document.getElementById('productSelect');
+        const qty = parseInt(document.getElementById('qty').value);
+        const productId = productSelect.value;
+        const productName = productSelect.selectedOptions[0]?.getAttribute('data-name');
+        const unitPrice = parseFloat(productSelect.selectedOptions[0]?.getAttribute('data-price'));
+
+        if (!productId || !productName || qty < 1 || isNaN(unitPrice)) {
+            alert("Please select a valid product and enter a quantity greater than 0.");
+            return;
+        }
+
+        const existing = items.find(i => i.product_id == productId);
+        if (existing) {
+            existing.quantity += qty;
+        } else {
+            items.push({ product_id: productId, product_name: productName, quantity: qty, unit_price: unitPrice });
+        }
+
+        updateTable();
+    }
+
+    function removeItem(index) {
+        items.splice(index, 1);
+        updateTable();
+    }
+
+    function updateTable() {
+        const tbody = document.querySelector('#itemsTable tbody');
+        tbody.innerHTML = '';
+        let grandTotal = 0;
+        items.forEach((item, i) => {
+            const total = item.quantity * item.unit_price;
+            grandTotal += total;
+            const row = `<tr>
+                <td>${item.product_name}</td>
+                <td>${item.quantity}</td>
+                <td>${item.unit_price.toFixed(2)}</td>
+                <td>${total.toFixed(2)}</td>
+                <td><button type="button" onclick="removeItem(${i})">Remove</button></td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+        const discountInput = document.getElementById('discount_value');
+        const discountPercent = parseFloat(discountInput.value) || 0;
+        const totalAfterDiscount = grandTotal * (1 - discountPercent / 100);
+        document.getElementById('itemsInput').value = JSON.stringify(items);
+    }
+
+    document.getElementById('quotationForm').addEventListener('submit', function(e) {
+        const customerName = document.querySelector('input[name="customer_name"]').value.trim();
+        if (!customerName) {
+            e.preventDefault();
+            alert("Please provide a customer name.");
+            return;
+        }
+        if (items.length === 0) {
+            e.preventDefault();
+            alert("Please add at least one item.");
+            return;
+        }
+        document.getElementById('itemsInput').value = JSON.stringify(items);
+        console.log("Submitting items:", items); // Debugging
+    });
+
+    function resetViewport() {
+        document.querySelector('meta[name="viewport"]').setAttribute('content',
+            'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no');
+        document.body.focus();
+    }
+
+    document.getElementById('quotationForm').addEventListener('submit', function() {
+        resetViewport();
+    });
+
+    if (window.innerWidth <= 480) {
+        document.querySelectorAll('.convert-button').forEach(btn => {
+            if (btn.textContent.trim() === 'Convert') {
+                btn.textContent = 'Conv';
+            }
+        });
+    }
+</script>
+</body>
+</html>

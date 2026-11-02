@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Report {{ date }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 20px; }
+        h1 { color: #1e3a8a; font-size: 18px; text-align: center; }
+        h2 { font-size: 14px; color: #1e3a8a; border-bottom: 2px solid #3b82f6; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        .summary { background-color: #d1fae5; padding: 10px; border-radius: 5px; }
+        .summary p { margin: 5px 0; font-weight: bold; }
+        img { max-width: 100px; }
+    </style>
+</head>
+<body>
+    <img src="{{ logo_path }}" alt="Logo">
+    <h1>Daily Report for {{ date }}</h1>
+    <p>Crown Tech Hub</p>
+    <p>Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25, Harare, Zimbabwe</p>
+
+    <div class="summary">
+        <h2>Cash Summary</h2>
+        <p>Opening Balance: ${{ "%.2f"|format(opening_balance) }}</p>
+        <p>Total Sales: ${{ "%.2f"|format(total_sales) }}</p>
+        <p>Total Extra Income: ${{ "%.2f"|format(total_income) }}</p>
+        <p>Total Expenses: ${{ "%.2f"|format(total_expenses) }}</p>
+        <p>Net Cash Flow: ${{ "%.2f"|format(net_cash_flow) }}</p>
+        <p>Closing Balance: ${{ "%.2f"|format(closing_balance) }}</p>
+    </div>
+
+    <h2>Sales</h2>
+    <table>
+        <thead>
+            <tr><th>Receipt #</th><th>Product</th><th>Qty</th><th>Total</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td>{{ sale.receipt.receipt_number }}</td>
+                <td>{{ sale.product.name }}</td>
+                <td>{{ sale.quantity }}</td>
+                <td>${{ "%.2f"|format(sale.total_price) }}</td>
+                <td>{{ sale.timestamp.strftime('%H:%M:%S') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">No sales for this day.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Expenses</h2>
+    <table>
+        <thead>
+            <tr><th>Description</th><th>Amount</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+            {% for expense in expenses %}
+            <tr>
+                <td>{{ expense.description }}</td>
+                <td>${{ "%.2f"|format(expense.amount) }}</td>
+                <td>{{ expense.timestamp.strftime('%H:%M:%S') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">No expenses for this day.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Extra Income</h2>
+    <table>
+        <thead>
+            <tr><th>Description</th><th>Amount</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+            {% for income in incomes %}
+            <tr>
+                <td>{{ income.description }}</td>
+                <td>${{ "%.2f"|format(income.amount) }}</td>
+                <td>{{ income.timestamp.strftime('%H:%M:%S') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">No extra income for this day.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Stock Requests</h2>
+    <table>
+        <thead>
+            <tr><th>Product</th><th>Qty</th><th>Action</th><th>Reason</th><th>Status</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+            {% for request in stock_requests %}
+            <tr>
+                <td>{{ request.product.name }}</td>
+                <td>{{ request.quantity }}</td>
+                <td>{{ request.action|capitalize }}</td>
+                <td>{{ request.reason or 'N/A' }}</td>
+                <td>{{ request.status|capitalize }}</td>
+                <td>{{ request.timestamp.strftime('%H:%M:%S') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No stock requests for this day.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Defect Requests</h2>
+    <table>
+        <thead>
+            <tr><th>Product</th><th>Qty</th><th>Reason</th><th>Status</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+            {% for request in defect_requests %}
+            <tr>
+                <td>{{ request.product.name }}</td>
+                <td>{{ request.quantity }}</td>
+                <td>{{ request.reason }}</td>
+                <td>{{ request.status|capitalize }}</td>
+                <td>{{ request.timestamp.strftime('%H:%M:%S') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">No defect requests for this day.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

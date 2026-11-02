@@ -1,0 +1,43 @@
+{% extends 'staff/base.html' %}
+{% block content %}
+<div class="section-head">
+  <h1 style="font-size:1.8rem;margin:0">Online orders</h1>
+  <form method="get" class="actions">
+    <input type="hidden" name="filter" value="{{ flt }}">
+    <input type="search" name="q" value="{{ q }}" placeholder="Order number, name, phone or email" style="width:300px" aria-label="Search orders">
+    <button class="btn btn-sm" type="submit">Search</button>
+  </form>
+</div>
+<nav class="filters" aria-label="Order filters">
+  {% for key, label in filters %}
+    <a href="{{ url_for('staff_orders.order_list', filter=key, q=q or None) }}" {% if flt == key %}aria-current="true"{% endif %}>{{ label }}{% if key in counts %} ({{ counts[key] }}){% endif %}</a>
+  {% endfor %}
+</nav>
+
+{% if pagination.items %}
+<div class="table-wrap"><table class="tbl">
+  <thead><tr><th>Order</th><th>Customer</th><th>Placed</th><th>Method</th><th>Status</th><th class="r">Total</th></tr></thead>
+  <tbody>
+  {% for o in pagination.items %}
+    <tr>
+      <td><a href="{{ url_for('staff_orders.order_detail', order_id=o.id) }}"><strong>{{ o.order_number }}</strong></a><div class="muted small">{{ o.items|length }} item{{ '' if o.items|length == 1 else 's' }}</div></td>
+      <td>{{ o.customer_name }}<div class="muted small">{{ o.customer_phone }}</div></td>
+      <td class="small">{{ o.created_at|when }}</td>
+      <td class="small">{{ 'Delivery' if o.delivery_method == 'delivery' else 'Collect' }}<div class="muted">{{ {'paynow':'Paynow','paypal':'PayPal','pay_at_shop':'Pay at shop','manual':'Manual'}.get(o.payment_method, '-') }}</div></td>
+      <td><span class="badge {{ 'badge-ok' if o.status in ('paid','ready','completed') else ('badge-bad' if o.status == 'cancelled' else 'badge-warn') }}">{{ o.status_label }}</span></td>
+      <td class="r num">{{ o.total|money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if pagination.pages > 1 %}
+<nav class="pager" aria-label="Pages">
+  {% for n in range(1, pagination.pages + 1) %}
+    {% if n == pagination.page %}<span class="cur">{{ n }}</span>{% else %}<a href="{{ url_for('staff_orders.order_list', filter=flt, q=q or None, page=n) }}">{{ n }}</a>{% endif %}
+  {% endfor %}
+</nav>
+{% endif %}
+{% else %}
+<div class="empty"><h3>No orders here</h3><p class="muted">{{ 'Nothing needs your attention right now.' if flt == 'action' else 'No orders match this filter.' }}</p></div>
+{% endif %}
+{% endblock %}

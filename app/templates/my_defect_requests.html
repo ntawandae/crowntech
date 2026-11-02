@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>My Requests</title>
+    {% include "cashier_base.html" %}
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 4px;
+            background: #f4f4f4;
+            margin: 0;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        *, *:before, *:after { box-sizing: inherit; }
+
+        h2 {
+            margin: 0 0 20px 0;
+            font-size: 1.5rem;
+            color: #343a40;
+        }
+        .section-title {
+            margin: 30px 0 15px 0;
+            font-size: 1.2rem;
+            color: #343a40;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            max-width: 1200px;
+            border-collapse: collapse;
+            background: white;
+            margin: 0 auto 20px auto;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .pending { background: orange; color: white; }
+        .approved { background: green; color: white; }
+        .rejected { background: red; color: white; }
+        p {
+            margin: 0 0 20px 0;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .product-name {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .product-name:hover::after {
+            content: attr(data-fullname);
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            z-index: 1000;
+            white-space: normal;
+            max-width: 300px;
+            word-wrap: break-word;
+            top: 100%;
+            left: 12px;
+        }
+        .edit-field {
+            width: 100%;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .edit-btn, .save-btn, .cancel-btn {
+            padding: 5px 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-right: 5px;
+        }
+        .edit-btn:hover, .save-btn:hover {
+            background-color: #0056b3;
+        }
+        .cancel-btn {
+            background-color: #6c757d;
+        }
+        .cancel-btn:hover {
+            background-color: #5a6268;
+        }
+
+        /* Responsive: Mobile */
+        @media (max-width: 768px) {
+            body {
+                padding: 4px;
+                font-size: 13px;
+                width: 100vw;
+                overflow-x: hidden;
+            }
+            h2, .section-title {
+                font-size: 1.2rem;
+                margin: 0 0 8px 0;
+            }
+            table {
+                display: table;
+                margin: 0 0 8px 0;
+                width: 100%;
+                max-width: 100%;
+            }
+            thead {
+                display: table-header-group;
+            }
+            th {
+                font-size: 0.8rem;
+                padding: 6px;
+                white-space: nowrap;
+            }
+            td {
+                font-size: 0.8rem;
+                padding: 6px;
+                word-break: break-word;
+            }
+            .product-name {
+                max-width: 100px;
+            }
+            .product-name:hover::after {
+                max-width: 200px;
+                left: 6px;
+            }
+            .status {
+                font-size: 0.75rem;
+                padding: 4px 8px;
+            }
+            .edit-field {
+                font-size: 0.75rem;
+                padding: 3px;
+            }
+            .edit-btn, .save-btn, .cancel-btn {
+                font-size: 0.75rem;
+                padding: 4px 8px;
+            }
+            p {
+                margin: 0 0 8px 0;
+                font-size: 0.95rem;
+            }
+            /* Stock table column widths */
+            th:nth-child(1), td:nth-child(1) { width: 45%; } /* Product */
+            th:nth-child(2), td:nth-child(2) { width: 15%; } /* Quantity */
+            th:nth-child(3), td:nth-child(3) { width: 20%; } /* Action */
+            th:nth-child(4), td:nth-child(4) { width: 20%; } /* Status */
+            /* Defect table column widths */
+            th:nth-child(1):not(:nth-child(4)), td:nth-child(1):not(:nth-child(4)) { width: 35%; } /* Product */
+            th:nth-child(2):not(:nth-child(4)), td:nth-child(2):not(:nth-child(4)) { width: 15%; } /* Quantity */
+            th:nth-child(3):not(:nth-child(4)), td:nth-child(3):not(:nth-child(4)) { width: 30%; } /* Reason */
+            th:nth-child(4):not(:nth-child(4)), td:nth-child(4):not(:nth-child(4)) { width: 20%; } /* Status */
+        }
+
+        /* Extra small screens */
+        @media (max-width: 480px) {
+            body {
+                padding: 3px;
+                font-size: 12px;
+            }
+            h2, .section-title {
+                font-size: 1.1rem;
+                margin: 0 0 6px 0;
+            }
+            table {
+                margin: 0 0 6px 0;
+            }
+            th, td {
+                padding: 4px;
+                font-size: 0.75rem;
+            }
+            .product-name {
+                max-width: 80px;
+            }
+            .product-name:hover::after {
+                max-width: 150px;
+                left: 4px;
+            }
+            .status {
+                font-size: 0.7rem;
+                padding: 3px 6px;
+            }
+            .edit-field {
+                font-size: 0.7rem;
+                padding: 2px;
+            }
+            .edit-btn, .save-btn, .cancel-btn {
+                font-size: 0.7rem;
+                padding: 3px 6px;
+            }
+            p {
+                margin: 0 0 6px 0;
+                font-size: 0.9rem;
+            }
+            /* Stock table column widths */
+            th:nth-child(1), td:nth-child(1) { width: 43%; } /* Product */
+            th:nth-child(2), td:nth-child(2) { width: 17%; } /* Quantity */
+            th:nth-child(3), td:nth-child(3) { width: 20%; } /* Action */
+            th:nth-child(4), td:nth-child(4) { width: 20%; } /* Status */
+            /* Defect table column widths */
+            th:nth-child(1):not(:nth-child(4)), td:nth-child(1):not(:nth-child(4)) { width: 33%; } /* Product */
+            th:nth-child(2):not(:nth-child(4)), td:nth-child(2):not(:nth-child(4)) { width: 17%; } /* Quantity */
+            th:nth-child(3):not(:nth-child(4)), td:nth-child(3):not(:nth-child(4)) { width: 30%; } /* Reason */
+            th:nth-child(4):not(:nth-child(4)), td:nth-child(4):not(:nth-child(4)) { width: 20%; } /* Status */
+        }
+    </style>
+    <script>
+        function enableEdit(row, requestType) {
+            const productCell = row.querySelector('.product-cell');
+            const quantityCell = row.querySelector('.quantity');
+            const actionCell = row.querySelector('.action');
+            const reasonCell = row.querySelector('.reason');
+            const statusCell = row.querySelector('.status-cell');
+
+            // Store original values for cancel
+            row.dataset.originalProduct = productCell.querySelector('.product-name').getAttribute('data-fullname');
+            row.dataset.originalQuantity = quantityCell.textContent;
+            row.dataset.originalAction = actionCell.textContent;
+            if (reasonCell) {
+                row.dataset.originalReason = reasonCell.textContent;
+            }
+
+            // Replace with editable fields
+            productCell.innerHTML = `
+                <select class="edit-field edit-product" name="product_id">
+                    {% for product in products %}
+                    <option value="{{ product.id }}" ${row.dataset.productId == '{{ product.id }}' ? 'selected' : ''}>{{ product.name }}</option>
+                    {% endfor %}
+                </select>`;
+            quantityCell.innerHTML = `<input type="number" class="edit-field edit-quantity" name="quantity" value="${row.dataset.quantity}" min="1" required>`;
+
+            if (requestType === 'stock') {
+                actionCell.innerHTML = `
+                    <select class="edit-field edit-action" name="action">
+                        <option value="add" ${row.dataset.action.toLowerCase() === 'add' ? 'selected' : ''}>Add</option>
+                        <option value="deduct" ${row.dataset.action.toLowerCase() === 'deduct' ? 'selected' : ''}>Deduct</option>
+                    </select>`;
+            } else {
+                reasonCell.innerHTML = `<input type="text" class="edit-field edit-reason" name="reason" value="${row.dataset.reason}" required>`;
+            }
+
+            statusCell.innerHTML = `
+                <span class="status pending">Pending</span>
+                <button class="save-btn" onclick="saveRequest(${row.dataset.requestId}, '${requestType}', this.closest('tr'))">Save</button>
+                <button class="cancel-btn" onclick="cancelEdit(this.closest('tr'), '${requestType}')">Cancel</button>`;
+        }
+
+        function cancelEdit(row, requestType) {
+            const productCell = row.querySelector('.product-cell');
+            const quantityCell = row.querySelector('.quantity');
+            const actionCell = row.querySelector('.action');
+            const reasonCell = row.querySelector('.reason');
+            const statusCell = row.querySelector('.status-cell');
+
+            // Restore original values
+            productCell.innerHTML = `<span class="product-name" data-fullname="${row.dataset.originalProduct}">${row.dataset.originalProduct.substring(0, 20)}${row.dataset.originalProduct.length > 20 ? '...' : ''}</span>`;
+            quantityCell.textContent = row.dataset.originalQuantity;
+            if (requestType === 'stock') {
+                actionCell.textContent = row.dataset.originalAction;
+            } else {
+                reasonCell.textContent = row.dataset.originalReason;
+            }
+            statusCell.innerHTML = `
+                <span class="status pending">Pending</span>
+                <button class="edit-btn" onclick="enableEdit(this.closest('tr'), '${requestType}')">Edit</button>`;
+        }
+
+        async function saveRequest(requestId, requestType, row) {
+            const formData = new FormData();
+            formData.append('product_id', row.querySelector('.edit-product').value);
+            formData.append('quantity', row.querySelector('.edit-quantity').value);
+            if (requestType === 'stock') {
+                formData.append('action', row.querySelector('.edit-action').value);
+            } else if (requestType === 'defect') {
+                formData.append('reason', row.querySelector('.edit-reason').value);
+            }
+
+            try {
+                const response = await fetch(`/cashier/edit_${requestType}_request/${requestId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert(result.message);
+                    // Update the row with new values
+                    const productName = row.querySelector('.edit-product option:checked').text;
+                    row.querySelector('.product-cell').innerHTML = `<span class="product-name" data-fullname="${productName}">${productName.substring(0, 20)}${productName.length > 20 ? '...' : ''}</span>`;
+                    row.querySelector('.quantity').textContent = formData.get('quantity');
+                    if (requestType === 'stock') {
+                        row.querySelector('.action').textContent = formData.get('action').charAt(0).toUpperCase() + formData.get('action').slice(1);
+                    } else {
+                        row.querySelector('.reason').textContent = formData.get('reason');
+                    }
+                    row.querySelector('.status-cell').innerHTML = `
+                        <span class="status pending">Pending</span>
+                        <button class="edit-btn" onclick="enableEdit(this.closest('tr'), '${requestType}')">Edit</button>`;
+                } else {
+                    alert(result.error || 'Error updating request.');
+                }
+            } catch (error) {
+                alert('Error updating request: ' + error.message);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h2>My Requests</h2>
+
+    <!-- Stock Requests Section -->
+    <div class="section-title">Stock Requests</div>
+    {% if stock_requests %}
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Action</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in stock_requests %}
+            <tr data-request-id="{{ req.id }}" data-product-id="{{ req.product_id }}" data-quantity="{{ req.quantity }}" data-action="{{ req.action }}">
+                <td data-label="Product" class="product-cell">
+                    <span class="product-name" data-fullname="{{ req.product.name if req.product else 'Unknown' }}">{{ req.product.name|truncate(20, True, '...') if req.product else 'Unknown' }}</span>
+                </td>
+                <td data-label="Quantity" class="quantity">{{ req.quantity }}</td>
+                <td data-label="Action" class="action">{{ req.action.capitalize() }}</td>
+                <td data-label="Status" class="status-cell">
+                    <span class="status {{ req.status.lower() }}">{{ req.status.capitalize() }}</span>
+                    {% if req.status.lower() == 'pending' %}
+                    <button class="edit-btn" onclick="enableEdit(this.closest('tr'), 'stock')">Edit</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No stock requests submitted yet.</p>
+    {% endif %}
+
+    <!-- Defect Requests Section -->
+    <div class="section-title">Defect Requests</div>
+    {% if defect_requests %}
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Reason</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in defect_requests %}
+            <tr data-request-id="{{ req.id }}" data-product-id="{{ req.product_id }}" data-quantity="{{ req.quantity }}" data-reason="{{ req.reason }}">
+                <td data-label="Product" class="product-cell">
+                    <span class="product-name" data-fullname="{{ req.product.name if req.product else 'Unknown' }}">{{ req.product.name|truncate(20, True, '...') if req.product else 'Unknown' }}</span>
+                </td>
+                <td data-label="Quantity" class="quantity">{{ req.quantity }}</td>
+                <td data-label="Reason" class="reason">{{ req.reason }}</td>
+                <td data-label="Status" class="status-cell">
+                    <span class="status {{ req.status.lower() }}">{{ req.status.capitalize() }}</span>
+                    {% if req.status.lower() == 'pending' %}
+                    <button class="edit-btn" onclick="enableEdit(this.closest('tr'), 'defect')">Edit</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No defect requests submitted yet.</p>
+    {% endif %}
+</body>
+</html>

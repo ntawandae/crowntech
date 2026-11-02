@@ -1,0 +1,85 @@
+{% extends 'shop/base.html' %}
+{% block title %}Checkout | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <h1 style="font-size:2rem">Checkout</h1>
+  <form method="post" class="two-col" novalidate>
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div>
+      <section class="panel">
+        <h2>Your details</h2>
+        <div class="grid-2">
+          <div class="field"><label for="name">Full name</label><input id="name" name="name" value="{{ form.name }}" autocomplete="name" required></div>
+          <div class="field"><label for="phone">Phone number</label><input id="phone" name="phone" value="{{ form.phone }}" autocomplete="tel" inputmode="tel" required></div>
+        </div>
+        <div class="field" style="margin-bottom:0"><label for="email">Email</label><input id="email" type="email" name="email" value="{{ form.email }}" autocomplete="email" required><div class="hint">Your receipt and order link are sent here. No account needed.</div></div>
+      </section>
+
+      <section class="panel">
+        <h2>Getting your order</h2>
+        <div class="choice" role="radiogroup" aria-label="Delivery method">
+          <label><input type="radio" name="delivery" value="pickup" {{ 'checked' if form.delivery == 'pickup' }}><span><strong>Collect from the shop</strong><span class="hint">{{ biz.address }}</span></span></label>
+          {% if delivery_enabled %}
+          <label><input type="radio" name="delivery" value="delivery" {{ 'checked' if form.delivery == 'delivery' }}><span><strong>Delivery</strong><span class="hint">{% if delivery_fee %}Delivery fee {{ delivery_fee|money }}.{% else %}We'll confirm the delivery cost with you after you order.{% endif %}</span></span></label>
+          {% endif %}
+        </div>
+        <div class="field" id="address-field" style="margin-top:14px;margin-bottom:0" hidden>
+          <label for="address">Delivery address</label>
+          <textarea id="address" name="address" autocomplete="street-address">{{ form.address }}</textarea>
+        </div>
+        <div class="field" style="margin:14px 0 0"><label for="notes">Notes for us (optional)</label><input id="notes" name="notes" value="{{ form.notes }}" maxlength="500"></div>
+      </section>
+
+      <section class="panel">
+        <h2>How would you like to pay?</h2>
+        {% if methods %}
+        <div class="choice" role="radiogroup" aria-label="Payment method">
+          {% for key, label, hint in methods %}
+          <label><input type="radio" name="payment" value="{{ key }}" {{ 'checked' if form.payment == key }}><span><strong>{{ label }}</strong><span class="hint">{{ hint }}</span></span></label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="flash flash-warning">Online ordering isn't switched on yet. Please contact us to place your order.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <aside class="panel summary">
+      <h2>Order summary</h2>
+      {% for l in lines %}
+      <div class="line" style="grid-template-columns:56px 1fr auto;padding:10px 0">
+        <div class="line-img" style="width:56px;height:44px">{% if l.p.image %}<img src="{{ l.p.image }}" alt="">{% endif %}</div>
+        <div class="small"><strong>{{ l.p.title }}</strong><div class="muted">Qty {{ l.qty }}</div></div>
+        <div class="num small">{{ l.total|money }}</div>
+      </div>
+      {% endfor %}
+      <div class="totals">
+        <div><span>Subtotal</span><span class="num">{{ subtotal|money }}</span></div>
+        <div id="fee-row" hidden><span>Delivery</span><span class="num">{{ delivery_fee|money }}</span></div>
+        <div class="grand"><span>Total</span><span class="num" id="grand" data-base="{{ subtotal }}" data-fee="{{ delivery_fee }}" data-symbol="{{ config.SHOP_CURRENCY_SYMBOL }}">{{ subtotal|money }}</span></div>
+      </div>
+      <button class="btn btn-gold btn-block" type="submit" {{ 'disabled' if not methods }}>Place order</button>
+      <p class="muted small" style="margin:12px 0 0">Your items are held for you while you pay.</p>
+    </aside>
+  </form>
+</div>
+<script>
+(function () {
+  var radios = document.querySelectorAll('input[name="delivery"]');
+  var addr = document.getElementById('address-field');
+  var feeRow = document.getElementById('fee-row');
+  var grand = document.getElementById('grand');
+  function update() {
+    var chosen = document.querySelector('input[name="delivery"]:checked');
+    var delivery = chosen && chosen.value === 'delivery';
+    addr.hidden = !delivery;
+    var fee = parseFloat(grand.dataset.fee) || 0;
+    feeRow.hidden = !(delivery && fee > 0);
+    var total = parseFloat(grand.dataset.base) + (delivery ? fee : 0);
+    grand.textContent = grand.dataset.symbol + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  radios.forEach(function (r) { r.addEventListener('change', update); });
+  update();
+})();
+</script>
+{% endblock %}
