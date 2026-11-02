@@ -22,6 +22,15 @@ CATEGORY_MAP = {
     "monitors": "Monitors",
     "monitor": "Monitors",
 }
+# Each category gets its own colour on the storefront (tiles, badges, image backdrops)
+CATEGORY_TONE = {
+    "Laptops": "blue",
+    "Gaming laptops": "violet",
+    "Phones": "teal",
+    "Monitors": "green",
+    "Accessories": "orange",
+    "Other": "steel",
+}
 CATEGORY_ORDER = ["Laptops", "Gaming laptops", "Phones", "Monitors", "Accessories", "Other"]
 
 _CUT_MARKERS = re.compile(

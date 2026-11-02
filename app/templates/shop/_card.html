@@ -1,11 +1,12 @@
 {% macro product_card(p) %}
-<article class="card {{ 'is-out' if not p.in_stock }}">
+<article class="card {{ 'is-out' if not p.in_stock }}" data-tone="{{ p.tone }}">
   <a class="card-media" href="{{ url_for('shop.product', product_id=p.id) }}" tabindex="-1" aria-hidden="true">
-    {% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy" width="400" height="300">{% else %}<span class="noimg">Photo coming soon</span>{% endif %}
+    {% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy" width="640" height="480">{% else %}<span class="noimg">{{ p.category }}</span>{% endif %}
+    <span class="cat-tag">{{ p.category }}</span>
   </a>
   <div class="card-body">
     <h3 class="card-title"><a href="{{ url_for('shop.product', product_id=p.id) }}">{{ p.title }}</a></h3>
-    {% if p.specs %}<ul class="specs">{% for s in p.specs %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
+    <ul class="specs">{% for s in p.specs[:3] %}<li>{{ s }}</li>{% endfor %}</ul>
     <div class="card-foot">
       <div>
         <div class="price">{{ p.price|money }}</div>

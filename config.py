@@ -71,6 +71,9 @@ class Config:
     ONLINE_PAYMENT_HOLD_MINUTES = int(os.environ.get("ONLINE_PAYMENT_HOLD_MINUTES", "45"))
     PICKUP_HOLD_HOURS = int(os.environ.get("PICKUP_HOLD_HOURS", "48"))
 
+    # Largest discount (% of subtotal) a cashier may give. 0 = no limit. Admins are never limited.
+    CASHIER_MAX_DISCOUNT_PERCENT = float(os.environ.get("CASHIER_MAX_DISCOUNT_PERCENT", "0"))
+
     # --- Paynow ----------------------------------------------------------
     PAYNOW_INTEGRATION_ID = os.environ.get("PAYNOW_INTEGRATION_ID", "")
     PAYNOW_INTEGRATION_KEY = os.environ.get("PAYNOW_INTEGRATION_KEY", "")

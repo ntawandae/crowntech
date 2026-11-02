@@ -9,10 +9,16 @@ from io import BytesIO
 from xhtml2pdf import pisa
 from ..models import Product, Sale, db, StockRequest, DefectRequests, Expense, QuotationItem, Quotation, Receipt, ExtraIncome, DailyCashBalance
 from sqlalchemy import func
+from flask import current_app
+from ..services import pos, quotes
+from ..services.pos import PricingError, SaleError
+from ..services.quotes import generate_quotation_number
+from ..utils.receipts import receipt_pdf, receipt_items, render_pdf, static_link_callback
+from ..utils.timeutil import ZIM_OFFSET, day_range, zim_now as _zim_now, zim_today as _zim_today
 import hashlib
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Define Blueprint
@@ -30,48 +36,26 @@ def cashier_required(f):
 # ----------------------------------------------------------------------
 # TIMEZONE HELPER – Zimbabwe (UTC+2, no DST)
 # ----------------------------------------------------------------------
-ZIM_OFFSET = timedelta(hours=2)
+# Time helpers now live in app/utils/timeutil.py (Zimbabwe local time is the stored convention).
 
 def get_zim_now():
-    """Current time in Zimbabwe local time (UTC+2)"""
-    return datetime.now(timezone.utc) + ZIM_OFFSET
+    """Current Zimbabwe local time (UTC+2)"""
+    return _zim_now()
 
 def get_zim_date_now():
     """Current Zimbabwe business date"""
-    return get_zim_now().date()
+    return _zim_today()
 
 def get_utc_range_for_zim_date(zim_date):
-    """
-    Returns the UTC datetime range covering 00:00:00 to 23:59:59.999999
-    Zimbabwe local time for the given business date.
-    """
-    start_local = datetime.combine(zim_date, datetime.min.time())
-    end_local   = datetime.combine(zim_date, datetime.max.time())
-    start_utc   = start_local - ZIM_OFFSET
-    end_utc     = end_local   - ZIM_OFFSET
-    return start_utc, end_utc
+    """Start/end of a Zimbabwe business day. (Name kept for older callers: stored times are local,
+    so this is a plain local-day range and no longer shifts by 2 hours.)"""
+    return day_range(zim_date)
 
 # Helper function to update daily cash balance
 def update_cash_balance(sales_amount=0.0, income_amount=0.0, expense_amount=0.0):
+    """Rebuild today's cash balance from the records (the amounts are ignored: the records are the truth)."""
     try:
-        zim_date = get_zim_date_now()
-        cash_balance = DailyCashBalance.query.filter_by(date=zim_date).first()
-        if not cash_balance:
-            previous_day = zim_date - timedelta(days=1)
-            previous_balance = DailyCashBalance.query.filter_by(date=previous_day).first()
-            opening_balance = previous_balance.closing_balance if previous_balance else 0.0
-            cash_balance = DailyCashBalance(
-                date=zim_date,
-                opening_balance=opening_balance,
-                closing_balance=opening_balance
-            )
-            db.session.add(cash_balance)
-
-        net_cash_flow = sales_amount + income_amount - expense_amount
-        cash_balance.closing_balance = cash_balance.opening_balance + net_cash_flow
-        cash_balance.updated_at = datetime.utcnow()  # UTC for audit
-        db.session.commit()
-        logger.debug(f"Updated Zim balance {zim_date}: Net={net_cash_flow}, Closing={cash_balance.closing_balance}")
+        pos.recompute_day(get_zim_date_now())
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating cash balance: {str(e)}")
@@ -101,7 +85,9 @@ def cashier_dashboard():
     )
     products = [p[0] for p in products]
     cart = session.get('cart', [])
-    return render_template('cashier_dashboard.html', products=products, cart=cart)
+    return render_template('cashier_dashboard.html', products=products, cart=cart,
+                           discount_limit=current_app.config['CASHIER_MAX_DISCOUNT_PERCENT'],
+                           delivery_enabled=True)
 # ----------------------------------------------------------------------
 # INVENTORY
 # ----------------------------------------------------------------------
@@ -158,166 +144,75 @@ def add_one_to_cart(product_id):
 # ----------------------------------------------------------------------
 # SELL + PRINT RECEIPT (original working version + Zim time)
 # ----------------------------------------------------------------------
+def _cart_lines():
+    """Cart lines priced from the live catalogue (never from a stale session copy)."""
+    lines = []
+    for item in session.get('cart', []):
+        product = db.session.get(Product, item.get('id')) if isinstance(item, dict) else None
+        if not product:
+            raise SaleError(f"A product in the cart no longer exists: {item.get('name', 'unknown')}.")
+        try:
+            qty = int(item.get('quantity', 0))
+        except (TypeError, ValueError):
+            qty = 0
+        if qty >= 1:
+            lines.append({"product": product, "qty": qty, "price": product.price})
+    return lines
+
+
+def _price_from_form(lines):
+    subtotal = sum((pos.D(l["price"]) * l["qty"] for l in lines), pos.D(0))
+    limit = current_app.config['CASHIER_MAX_DISCOUNT_PERCENT']
+    return pos.price_sale(subtotal, request.form.get('discount_mode', 'amount'),
+                          request.form.get('discount_value') or 0,
+                          request.form.get('delivery_fee') or 0, limit)
+
+
+def _process_sale(want_receipt):
+    """Shared by 'Sell' and 'Sell & receipt'. The cart is only emptied once the sale is saved."""
+    back = redirect(url_for('cashier.cashier_dashboard'))
+    try:
+        lines = _cart_lines()
+        if not lines:
+            flash("Cart is empty.", "warning")
+            return back
+        pricing = _price_from_form(lines)
+        result = pos.complete_sale(
+            lines, current_user, pricing,
+            customer={"name": request.form.get('customer_name'), "email": request.form.get('customer_email'),
+                      "phone": request.form.get('customer_phone')},
+            delivery_address=request.form.get('delivery_address'))
+    except (PricingError, SaleError) as exc:
+        flash(str(exc), "danger")
+        return back
+    except Exception:
+        db.session.rollback()
+        logger.exception("Unexpected error while selling")
+        flash("Something went wrong and the sale was not saved. Please try again.", "danger")
+        return back
+
+    session.pop('cart', None)
+    session.pop('discount', None)
+    session.modified = True
+    receipt = result['receipt']
+    summary = f"Sale completed. Receipt #{receipt.receipt_number} - total ${receipt.total:.2f}."
+    if not want_receipt:
+        flash(summary, "success")
+        return back
+    pdf = receipt_pdf(receipt, result['items'], current_user.full_name)
+    if pdf is None:
+        flash(f"{summary} The receipt PDF could not be created: reprint it from Reports.", "warning")
+        return back
+    flash(summary, "success")
+    return send_file(pdf, as_attachment=True, download_name=f"receipt_{receipt.receipt_number}.pdf",
+                     mimetype='application/pdf')
+
+
 @cashier_bp.route('/sell_and_receipt', methods=['POST'])
 @login_required
 @cashier_required
 def sell_and_receipt():
-    try:
-        logger.debug(f"Form data received: {dict(request.form)}")
-        logger.debug(f"Session cart: {session.get('cart', [])}")
-        logger.debug(f"Session discount: {session.get('discount', 0)}")
-        cart = session.get('cart', [])
-        if not cart:
-            logger.warning("Cart is empty in sell_and_receipt")
-            flash("Cart is empty.", "warning")
-            return redirect(url_for('cashier.cashier_dashboard'))
-
-        sold_items = []
-        subtotal = 0
-        for item in cart:
-            if not isinstance(item, dict) or 'id' not in item or not isinstance(item['id'], int):
-                logger.error(f"Invalid cart item: {item}")
-                flash(f"Invalid cart item: {item.get('name', 'unknown')}.", "danger")
-                return redirect(url_for('cashier.cashier_dashboard'))
-            product_id = item['id']
-            product = Product.query.get(product_id)
-            if not product:
-                logger.error(f"Product not found for ID: {product_id}")
-                flash(f"Product not found: {item.get('name', 'unknown')}.", "danger")
-                return redirect(url_for('cashier.cashier_dashboard'))
-            if product.quantity < item['quantity']:
-                logger.error(f"Insufficient stock for product ID {product_id}: {product.name}")
-                flash(f"Not enough stock for {item['name']}. Available: {product.quantity}.", "danger")
-                return redirect(url_for('cashier.cashier_dashboard'))
-            item_total = item['price'] * item['quantity']
-            subtotal += item_total
-            sold_items.append({
-                'id': product_id,
-                'name': item['name'],
-                'price': item['price'],
-                'quantity': item['quantity'],
-                'original_total_price': item_total,
-                'total_price': item_total
-            })
-
-        discount_amount = float(session.get('discount', request.form.get('discount_sell_receipt', 0)) or 0.0)
-        if discount_amount < 0:
-            flash("Discount cannot be negative.", "danger")
-            return redirect(url_for('cashier.cashier_dashboard'))
-        if discount_amount > subtotal:
-            discount_amount = subtotal
-
-        session['discount'] = discount_amount
-        session.modified = True
-
-        final_total = subtotal - discount_amount
-        tax_rate = 0.0
-        tax = final_total * tax_rate
-        total = final_total + tax
-
-        zim_now = get_zim_now()
-        today_str = zim_now.strftime('%Y%m%d')
-        prefix = f"SALE-{today_str}-"
-
-        last_receipt = Receipt.query.filter(Receipt.receipt_number.like(f"{prefix}%")).order_by(Receipt.receipt_number.desc()).first()
-        if last_receipt:
-            last_number = int(last_receipt.receipt_number.split('-')[-1])
-            receipt_number = f"{prefix}{last_number + 1:04d}"
-        else:
-            receipt_number = f"{prefix}0001"
-
-        max_retries = 5
-        retry_count = 0
-        while Receipt.query.filter_by(receipt_number=receipt_number).first() and retry_count < max_retries:
-            retry_count += 1
-            receipt_number = f"{prefix}{int(receipt_number.split('-')[-1]) + 1:04d}"
-
-        if retry_count >= max_retries:
-            flash("Unable to generate a unique receipt number.", "danger")
-            return redirect(url_for('cashier.cashier_dashboard'))
-
-        receipt = Receipt(
-            receipt_number=receipt_number,
-            subtotal=subtotal,
-            tax=tax,
-            total=total,
-            customer_name=request.form.get('customer_name', ''),
-            customer_email=request.form.get('customer_email', ''),
-            customer_phone=request.form.get('customer_phone', ''),
-            cashier_id=current_user.id,
-            timestamp=zim_now  # Zim time
-        )
-        db.session.add(receipt)
-        db.session.flush()
-
-        for item in sold_items:
-            product = Product.query.get(item['id'])
-            if not product:
-                raise ValueError(f"Product not found for ID {item['id']}")
-            product.quantity -= item['quantity']
-            item_total = item['original_total_price']
-            item_discount = (item_total / subtotal) * discount_amount if subtotal > 0 else 0
-            item['total_price'] = item_total - item_discount
-            selling_price_per_unit = item['price']
-            cost_price = float(product.cost_price or 0.0)
-            profit = (selling_price_per_unit - cost_price) * item['quantity']
-            sale = Sale(
-                product_id=product.id,
-                quantity=item['quantity'],
-                total_price=item['total_price'],
-                profit=profit,
-                cashier_id=current_user.id,
-                timestamp=zim_now,
-                receipt_id=receipt.id
-            )
-            db.session.add(sale)
-
-        db.session.commit()
-        update_cash_balance(sales_amount=total)  # already uses Zim date
-
-        # Generate PDF
-        html = render_template(
-            'receipt_template.html',
-            items=sold_items,
-            subtotal=subtotal,
-            discount=discount_amount,
-            tax=tax,
-            total=total,
-            receipt_number=receipt.receipt_number,
-            customer_name=receipt.customer_name,
-            customer_email=receipt.customer_email,
-            customer_phone=receipt.customer_phone,
-            printed_by=current_user.full_name,
-            business_name='Crown Tech Hub',
-            business_address='Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25, Harare, Zimbabwe',
-            logo_path=url_for('static', filename='images/cthlogo.jpg', _external=True),
-            current_year=datetime.utcnow().year,
-            timestamp=receipt.timestamp
-        )
-        buffer = BytesIO()
-        pisa_status = pisa.CreatePDF(html, dest=buffer)
-        if pisa_status.err:
-            flash("Failed to generate receipt PDF.", "danger")
-            return redirect(url_for('cashier.cashier_dashboard'))
-        buffer.seek(0)
-
-        session.pop('cart', None)
-        session.pop('discount', None)
-        session.modified = True
-
-        flash("Sale completed and receipt generated.", "success")
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name=f"receipt_{receipt.receipt_number}.pdf",
-            mimetype='application/pdf'
-        )
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error processing sale: {str(e)}")
-        flash(f"Error processing sale: {str(e)}", "danger")
-        return redirect(url_for('cashier.cashier_dashboard'))
+    return _process_sale(want_receipt=True)
 
 
 # ----------------------------------------------------------------------
@@ -327,284 +222,54 @@ def sell_and_receipt():
 @login_required
 @cashier_required
 def sell_items():
-    try:
-        cart = session.get('cart', [])
-        if not cart:
-            flash("Cart is empty.", "warning")
-            return redirect(url_for('cashier.cashier_dashboard'))
-
-        subtotal = 0
-        sold_items = []
-        for item in cart:
-            if 'id' not in item:
-                flash(f"Invalid cart item: {item.get('name', 'unknown')}.", "danger")
-                return redirect(url_for('cashier.cashier_dashboard'))
-            product = Product.query.get(item['id'])
-            if not product:
-                flash(f"Product not found: {item.get('name', 'unknown')}.", "danger")
-                return redirect(url_for('cashier.cashier_dashboard'))
-            if product.quantity < item['quantity']:
-                flash(f"Not enough stock for {item['name']}. Available: {product.quantity}.", "danger")
-                return redirect(url_for('cashier.cashier_dashboard'))
-            item_total = item['price'] * item['quantity']
-            subtotal += item_total
-            sold_items.append({
-                'id': item['id'],
-                'name': item['name'],
-                'price': item['price'],
-                'quantity': item['quantity'],
-                'original_total_price': item_total,
-                'total_price': item_total
-            })
-
-        discount_amount = float(request.form.get('discount', 0) or 0.0)
-        if discount_amount < 0:
-            flash("Discount cannot be negative.", "danger")
-            return redirect(url_for('cashier.cashier_dashboard'))
-        if discount_amount > subtotal:
-            discount_amount = subtotal
-
-        final_total = subtotal - discount_amount
-        tax_rate = 0.0
-        tax = final_total * tax_rate
-        total = final_total + tax
-
-        zim_now = get_zim_now()
-        today_str = zim_now.strftime('%Y%m%d')
-        prefix = f"SALE-{today_str}-"
-
-        last_receipt = Receipt.query.filter(Receipt.receipt_number.like(f"{prefix}%")).order_by(Receipt.receipt_number.desc()).first()
-        if last_receipt:
-            last_number = int(last_receipt.receipt_number.split('-')[-1])
-            receipt_number = f"{prefix}{last_number + 1:04d}"
-        else:
-            receipt_number = f"{prefix}0001"
-
-        max_retries = 5
-        retry_count = 0
-        while Receipt.query.filter_by(receipt_number=receipt_number).first() and retry_count < max_retries:
-            retry_count += 1
-            receipt_number = f"{prefix}{int(receipt_number.split('-')[-1]) + 1:04d}"
-
-        if retry_count >= max_retries:
-            flash("Unable to generate a unique receipt number.", "danger")
-            return redirect(url_for('cashier.cashier_dashboard'))
-
-        receipt = Receipt(
-            receipt_number=receipt_number,
-            subtotal=subtotal,
-            tax=tax,
-            total=total,
-            customer_name=request.form.get('customer_name', ''),
-            customer_email=request.form.get('customer_email', ''),
-            customer_phone=request.form.get('customer_phone', ''),
-            cashier_id=current_user.id,
-            timestamp=zim_now
-        )
-        db.session.add(receipt)
-        db.session.flush()
-
-        for item in sold_items:
-            product = Product.query.get(item['id'])
-            product.quantity -= item['quantity']
-            item_total = item['original_total_price']
-            item_discount = (item_total / subtotal) * discount_amount if subtotal > 0 else 0
-            item['total_price'] = item_total - item_discount
-            selling_price_per_unit = item['price']
-            cost_price = float(product.cost_price or 0.0)
-            profit = (selling_price_per_unit - cost_price) * item['quantity']
-            sale = Sale(
-                product_id=product.id,
-                quantity=item['quantity'],
-                total_price=item['total_price'],
-                profit=profit,
-                cashier_id=current_user.id,
-                timestamp=zim_now,
-                receipt_id=receipt.id
-            )
-            db.session.add(sale)
-
-        db.session.commit()
-        update_cash_balance(sales_amount=total)
-
-        session.pop('cart', None)
-        session.pop('discount', None)
-        session.modified = True
-
-        flash(f"Sale completed. Receipt #{receipt.receipt_number} recorded.", "success")
-        return redirect(url_for('cashier.cashier_dashboard'))
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error processing sale: {str(e)}")
-        flash(f"Error processing sale: {str(e)}", "danger")
-        return redirect(url_for('cashier.cashier_dashboard'))
+    return _process_sale(want_receipt=False)
     
 @cashier_bp.route('/quotations/<int:quotation_id>/convert', methods=['POST'])
 @login_required
 @cashier_required
 def convert_quotation(quotation_id):
+    quotation = Quotation.query.get_or_404(quotation_id)
+    if quotation.created_by_id != current_user.id:
+        abort(403)
     try:
-        quotation = Quotation.query.get_or_404(quotation_id)
-        if quotation.created_by_id != current_user.id:
-            abort(403)
-        if quotation.converted:
-            flash("This quotation has already been converted to a sale.", "warning")
-            return redirect(url_for('cashier.quotations'))
-
-        for q_item in quotation.items:
-            product = Product.query.get(q_item.product_id)
-            if not product:
-                flash(f"Product '{q_item.product_name}' no longer exists.", "danger")
-                return redirect(url_for('cashier.quotations'))
-            if product.quantity < q_item.quantity:
-                flash(f"Not enough stock for '{product.name}'. Requested: {q_item.quantity}, Available: {product.quantity}.", "danger")
-                return redirect(url_for('cashier.quotations'))
-
-        sold_items = []
-        subtotal = 0
-        for q_item in quotation.items:
-            item_total = q_item.unit_price * q_item.quantity
-            subtotal += item_total
-            sold_items.append({
-                'id': q_item.product_id,
-                'name': q_item.product_name,
-                'price': q_item.unit_price,
-                'quantity': q_item.quantity,
-                'original_total_price': item_total,
-                'total_price': item_total
-            })
-
-        discount_amount = float(quotation.discount or 0.0)
-        logger.debug(f"Discount amount: {discount_amount}")
-        if discount_amount < 0:
-            flash("Discount cannot be negative.", "danger")
-            return redirect(url_for('cashier.quotations'))
-        if discount_amount > subtotal:
-            discount_amount = subtotal
-
-        final_total = subtotal - discount_amount
-        tax_rate = 0.0
-        tax = final_total * tax_rate
-        total = final_total + tax
-
-        today = datetime.utcnow().strftime('%Y%m%d')
-        prefix = f"SALE-{today}-"
-        last_receipt = Receipt.query.filter(Receipt.receipt_number.like(f"{prefix}%")).order_by(Receipt.receipt_number.desc()).first()
-        if last_receipt:
-            last_number = int(last_receipt.receipt_number.split('-')[-1])
-            receipt_number = f"{prefix}{last_number + 1:04d}"
-        else:
-            receipt_number = f"{prefix}0001"
-
-        max_retries = 5
-        retry_count = 0
-        while Receipt.query.filter_by(receipt_number=receipt_number).first() and retry_count < max_retries:
-            retry_count += 1
-            last_number = int(receipt_number.split('-')[-1]) + 1
-            receipt_number = f"{prefix}{last_number:04d}"
-            logger.debug(f"Retrying with receipt_number: {receipt_number}")
-
-        if retry_count >= max_retries:
-            logger.error("Failed to generate unique receipt_number")
-            flash("Unable to generate a unique receipt number.", "danger")
-            return redirect(url_for('cashier.quotations'))
-
-        receipt = Receipt(
-            receipt_number=receipt_number,
-            subtotal=subtotal,
-            tax=tax,
-            total=total,
-            customer_name=quotation.customer_name,
+        result = quotes.convert_to_sale(
+            quotation, current_user,
             customer_email=request.form.get('customer_email', ''),
             customer_phone=request.form.get('customer_phone', ''),
-            cashier_id=current_user.id,
-            timestamp=datetime.utcnow()
-        )
-        db.session.add(receipt)
-        db.session.flush()
-
-        # === PROFIT LOOP FOR QUOTATION CONVERSION ===
-        for item in sold_items:
-            product = Product.query.get(item['id'])
-            product.quantity -= item['quantity']
-            item_total = item['original_total_price']
-            item_discount = (item_total / subtotal) * discount_amount if subtotal > 0 else 0
-            item['total_price'] = item_total - item_discount
-
-            # === PROFIT ===
-            selling_price_per_unit = item['price']
-            cost_price = float(product.cost_price or 0.0)
-            profit = (selling_price_per_unit - cost_price) * item['quantity']
-
-            sale = Sale(
-                product_id=product.id,
-                quantity=item['quantity'],
-                total_price=item['total_price'],
-                profit=profit,
-                cashier_id=current_user.id,
-                timestamp=datetime.utcnow(),
-                receipt_id=receipt.id
-            )
-            db.session.add(sale)
-
-            logger.debug(f"Profit (from quotation): {product.name} | Qty: {item['quantity']} | "
-                         f"Price: ${selling_price_per_unit:.2f} | Cost: ${cost_price:.2f} | "
-                         f"Profit: ${profit:.2f}")
-
-        quotation.converted = True
-        db.session.commit()
-
-        # Update cash balance
-        update_cash_balance(datetime.utcnow(), sales_amount=total)
-
-        try:
-            html = render_template(
-                'receipt_template.html',
-                items=sold_items,
-                subtotal=subtotal,
-                discount=discount_amount,
-                tax=tax,
-                total=total,
-                receipt_number=receipt_number,
-                customer_name=receipt.customer_name,
-                customer_email=receipt.customer_email,
-                customer_phone=receipt.customer_phone,
-                printed_by=current_user.full_name,
-                business_name='Crown Tech Hub',
-                business_address='Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25, Harare, Zimbabwe',
-                logo_path=url_for('static', filename='images/cthlogo.jpg', _external=True),
-                current_year=datetime.utcnow().year,
-                timestamp=receipt.timestamp
-            )
-            buffer = BytesIO()
-            pisa_status = pisa.CreatePDF(html, dest=buffer)
-            if pisa_status.err:
-                logger.error(f"PDF generation failed: {pisa_status.err}")
-                flash("Failed to generate receipt PDF.", "danger")
-                return redirect(url_for('cashier.quotations'))
-            buffer.seek(0)
-        except Exception as e:
-            logger.error(f"PDF generation failed: {str(e)}")
-            flash(f"PDF generation failed: {str(e)}", "danger")
-            return redirect(url_for('cashier.quotations'))
-
-        flash(f"Quotation {quotation.quotation_number} converted to sale. Receipt #{receipt_number} generated.", "success")
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name=f"receipt_{receipt_number}.pdf",
-            mimetype='application/pdf'
-        )
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error converting quotation: {str(e)}")
-        flash(f"Error converting quotation: {str(e)}", "danger")
+            delivery_fee=request.form.get('delivery_fee') or 0)
+    except (PricingError, SaleError) as exc:
+        flash(str(exc), "danger")
         return redirect(url_for('cashier.quotations'))
+    except Exception:
+        db.session.rollback()
+        logger.exception("Error converting quotation")
+        flash("Something went wrong converting that quotation. Nothing was changed.", "danger")
+        return redirect(url_for('cashier.quotations'))
+
+    receipt = result['receipt']
+    flash(f"Quotation {quotation.quotation_number} converted. Receipt #{receipt.receipt_number} recorded.", "success")
+    pdf = receipt_pdf(receipt, result['items'], current_user.full_name)
+    if pdf is None:
+        flash("The receipt PDF could not be created: reprint it from Reports.", "warning")
+        return redirect(url_for('cashier.quotations'))
+    return send_file(pdf, as_attachment=True, download_name=f"receipt_{receipt.receipt_number}.pdf",
+                     mimetype='application/pdf')
 
 
 # === ALL OTHER ROUTES UNCHANGED (kept for completeness) ===
+
+@cashier_bp.route('/receipt/<int:receipt_id>/pdf')
+@login_required
+@cashier_required
+def reprint_receipt(receipt_id):
+    receipt = Receipt.query.get_or_404(receipt_id)
+    pdf = receipt_pdf(receipt, receipt_items(receipt), current_user.full_name)
+    if pdf is None:
+        flash("Could not create the receipt PDF.", "danger")
+        return redirect(url_for('cashier.daily_report'))
+    return send_file(pdf, as_attachment=True, download_name=f"receipt_{receipt.receipt_number}.pdf",
+                     mimetype='application/pdf')
+
 
 @cashier_bp.route('/clear_cart', methods=['POST'])
 @login_required
@@ -888,23 +553,7 @@ def daily_report():
             .filter(ExtraIncome.timestamp.between(start_utc, end_utc)).scalar() or 0.0
         net_cash_flow = total_sales + total_income - total_expenses
 
-        cash_balance = DailyCashBalance.query.filter_by(date=report_date_local).first()
-        if not cash_balance:
-            prev_day = report_date_local - timedelta(days=1)
-            prev = DailyCashBalance.query.filter_by(date=prev_day).first()
-            opening = prev.closing_balance if prev else 0.0
-            cash_balance = DailyCashBalance(
-                date=report_date_local,
-                opening_balance=opening,
-                closing_balance=opening + net_cash_flow,
-                updated_at=datetime.utcnow()
-            )
-            db.session.add(cash_balance)
-            db.session.commit()
-        else:
-            cash_balance.closing_balance = cash_balance.opening_balance + net_cash_flow
-            cash_balance.updated_at = datetime.utcnow()
-            db.session.commit()
+        cash_balance = pos.recompute_day(report_date_local)
 
         # Hourly chart – Zimbabwe local hours
         labels, sales_data, expenses_data, income_data = [], [], [], []
@@ -913,7 +562,7 @@ def daily_report():
         income_records  = ExtraIncome.query.filter(ExtraIncome.timestamp.between(start_utc, end_utc)).all()
 
         def local_hour(ts):
-            return (ts + ZIM_OFFSET).hour
+            return ts.hour  # stored times are already Zimbabwe local
 
         for hour in range(24):
             labels.append(f"{hour:02d}:00")
@@ -943,7 +592,7 @@ def daily_report():
                     logo_path=url_for('static', filename='images/cthlogo.jpg', _external=True)
                 )
                 buffer = BytesIO()
-                pisa_status = pisa.CreatePDF(html, dest=buffer)
+                pisa_status = pisa.CreatePDF(html, dest=buffer, link_callback=static_link_callback)
                 if pisa_status.err:
                     flash("Failed to generate PDF.", "danger")
                     return redirect(url_for('cashier.daily_report'))
@@ -986,22 +635,6 @@ def daily_report():
         flash("An error occurred while loading the report.", "danger")
         return redirect(url_for('cashier.cashier_dashboard'))
 
-def generate_quotation_number():
-    last_quotation = Quotation.query.order_by(Quotation.id.desc()).first()
-    prefix = "cthq"
-    if last_quotation and last_quotation.quotation_number:
-        qnum_lower = last_quotation.quotation_number.lower()
-        if qnum_lower.startswith(prefix):
-            number_part = qnum_lower[len(prefix):]
-            try:
-                last_number = int(number_part)
-            except ValueError:
-                last_number = 0
-        else:
-            last_number = 0
-    else:
-        last_number = 0
-    return f"{prefix}{last_number + 1:03d}"
 
 @cashier_bp.route('/quotations', methods=['GET', 'POST'])
 @login_required
@@ -1009,98 +642,39 @@ def generate_quotation_number():
 def quotations():
     if request.method == 'POST':
         try:
-            customer_name = request.form.get('customer_name', '').strip()
-            discount = float(request.form.get('discount_value', 0))
-            items_json = request.form.get('items')
-            items = json.loads(items_json) if items_json else []
-
-            if not items or not customer_name:
-                flash("Please provide customer name and at least one item.", "danger")
-                return redirect(url_for('cashier.quotations'))
-
-            quotation_number = generate_quotation_number()
-
-            quotation = Quotation(
-                quotation_number=quotation_number,
-                customer_name=customer_name,
-                created_by_id=current_user.id,
-                discount=discount,
-                created_at=datetime.utcnow()
-            )
-            db.session.add(quotation)
-            db.session.flush()
-
-            for item in items:
-                product_id = item.get('product_id')
-                product = Product.query.get(product_id)
-                if not product:
-                    db.session.rollback()
-                    flash(f"Product ID {product_id} not found.", "danger")
-                    return redirect(url_for('cashier.quotations'))
-
-                qitem = QuotationItem(
-                    quotation_id=quotation.id,
-                    product_id=product_id,
-                    product_name=item.get('product_name'),
-                    quantity=int(item.get('quantity', 1)),
-                    unit_price=float(item.get('unit_price')),
-                    total_price=float(item.get('quantity', 1)) * float(item.get('unit_price'))
-                )
-                db.session.add(qitem)
-
-            db.session.commit()
-            flash(f"Quotation {quotation_number} created successfully!", "success")
-            return redirect(url_for('cashier.quotations'))
-
-        except (ValueError, json.JSONDecodeError) as e:
+            customer, items, discount = quotes.parse_quote_form(
+                request.form, current_app.config['CASHIER_MAX_DISCOUNT_PERCENT'])
+            q = quotes.save_quotation(current_user, customer, items, discount)
+            flash(f"Quotation {q.quotation_number} created.", "success")
+        except PricingError as exc:
+            flash(str(exc), "danger")
+        except Exception:
             db.session.rollback()
-            flash(f"Error creating quotation: Invalid input data.", "danger")
-            return redirect(url_for('cashier.quotations'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error creating quotation: {str(e)}", "danger")
-            return redirect(url_for('cashier.quotations'))
+            logger.exception("Error creating quotation")
+            flash("The quotation could not be saved. Please try again.", "danger")
+        return redirect(url_for('cashier.quotations'))
 
-    products = Product.query.all()
-    quotations = Quotation.query.filter_by(created_by_id=current_user.id).order_by(Quotation.created_at.desc()).all()
-    return render_template('cashier_quotations.html', products=products, quotations=quotations)
+    products = Product.query.order_by(Product.name).all()
+    mine = Quotation.query.filter_by(created_by_id=current_user.id).order_by(Quotation.created_at.desc()).all()
+    return render_template('quotations.html', products=products, quotations=mine, edit=None)
 
 @cashier_bp.route('/download_quotation/<int:quotation_id>')
 @login_required
 @cashier_required
 def download_quotation(quotation_id):
-    try:
-        quotation = Quotation.query.get_or_404(quotation_id)
-        if quotation.created_by_id != current_user.id:
-            abort(403)
-
-        html = render_template(
-            'print_quotation.html',
-            quotation=quotation,
-            business_name="Crown Tech Hub",
-            business_address="Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25",
-            printed_by=current_user.full_name,
-            logo_path=url_for('static', filename='images/cthlogo.jpg', _external=True)
-        )
-        buffer = BytesIO()
-        pisa_status = pisa.CreatePDF(html, dest=buffer)
-        if pisa_status.err:
-            logger.error(f"PDF generation failed: {pisa_status.err}")
-            flash("Failed to generate quotation PDF.", "danger")
-            return redirect(url_for('cashier.quotations'))
-        buffer.seek(0)
-
-        return send_file(
-            buffer,
-            as_attachment=True,
-            download_name=f"quotation_{quotation.quotation_number}.pdf",
-            mimetype='application/pdf'
-        )
-
-    except Exception as e:
-        logger.error(f"Error generating PDF: {str(e)}")
-        flash(f"Error generating PDF: {str(e)}", "danger")
+    quotation = Quotation.query.get_or_404(quotation_id)
+    if quotation.created_by_id != current_user.id:
+        abort(403)
+    pdf = render_pdf('print_quotation.html', quotation=quotation,
+                     business_name=current_app.config['BUSINESS_NAME'],
+                     business_address=current_app.config['BUSINESS_ADDRESS'],
+                     printed_by=current_user.full_name,
+                     logo_path=url_for('static', filename='images/cthlogo.jpg'))
+    if pdf is None:
+        flash("Failed to generate the quotation PDF.", "danger")
         return redirect(url_for('cashier.quotations'))
+    return send_file(pdf, as_attachment=True, download_name=f"quotation_{quotation.quotation_number}.pdf",
+                     mimetype='application/pdf')
 
 @cashier_bp.route('/quotations/<int:quotation_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -1110,55 +684,26 @@ def edit_quotation(quotation_id):
     if quotation.created_by_id != current_user.id:
         abort(403)
     if quotation.converted:
-        flash("Cannot edit a converted quotation.", "warning")
+        flash("A converted quotation can't be edited.", "warning")
         return redirect(url_for('cashier.quotations'))
 
     if request.method == 'POST':
         try:
-            customer_name = request.form.get('customer_name', '').strip()
-            discount = float(request.form.get('discount_value', 0))
-            items_json = request.form.get('items')
-            items = json.loads(items_json) if items_json else []
-
-            if not customer_name or not items:
-                flash("Customer name and at least one item are required.", "danger")
-                return redirect(url_for('cashier.edit_quotation', quotation_id=quotation.id))
-
-            quotation.customer_name = customer_name
-            quotation.discount = discount
-
-            quotation.items.clear()
-            for item in items:
-                product_id = item.get('product_id')
-                product = Product.query.get(product_id)
-                if not product:
-                    db.session.rollback()
-                    flash(f"Product ID {product_id} not found.", "danger")
-                    return redirect(url_for('cashier.edit_quotation', quotation_id=quotation.id))
-
-                qitem = QuotationItem(
-                    quotation_id=quotation.id,
-                    product_id=product_id,
-                    product_name=item.get('product_name'),
-                    quantity=int(item.get('quantity', 1)),
-                    unit_price=float(item.get('unit_price')),
-                    total_price=float(item.get('quantity', 1)) * float(item.get('unit_price'))
-                )
-                db.session.add(qitem)
-
-            db.session.commit()
-            flash(f"Quotation {quotation.quotation_number} updated successfully.", "success")
+            customer, items, discount = quotes.parse_quote_form(
+                request.form, current_app.config['CASHIER_MAX_DISCOUNT_PERCENT'])
+            quotes.save_quotation(current_user, customer, items, discount, quotation=quotation)
+            flash(f"Quotation {quotation.quotation_number} updated.", "success")
             return redirect(url_for('cashier.quotations'))
-
-        except (ValueError, json.JSONDecodeError) as e:
+        except PricingError as exc:
+            flash(str(exc), "danger")
+        except Exception:
             db.session.rollback()
-            flash(f"Error updating quotation: Invalid input data.", "danger")
-            return redirect(url_for('cashier.edit_quotation', quotation_id=quotation.id))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error updating quotation: {str(e)}", "danger")
-            return redirect(url_for('cashier.edit_quotation', quotation_id=quotation.id))
+            logger.exception("Error updating quotation")
+            flash("The quotation could not be saved. Please try again.", "danger")
+        return redirect(url_for('cashier.edit_quotation', quotation_id=quotation.id))
 
-    products = Product.query.all()
-    quotations = Quotation.query.filter_by(created_by_id=current_user.id).order_by(Quotation.created_at.desc()).all()
-    return render_template('cashier_quotations.html', products=products, quotations=quotations, edit_quotation=quotation)
+    products = Product.query.order_by(Product.name).all()
+    mine = Quotation.query.filter_by(created_by_id=current_user.id).order_by(Quotation.created_at.desc()).all()
+    return render_template('quotations.html', products=products, quotations=mine,
+                           edit=quotes.quotation_edit_payload(quotation), edit_id=quotation.id,
+                           edit_number=quotation.quotation_number)

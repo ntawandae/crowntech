@@ -6,8 +6,8 @@
   <aside aria-label="Categories">
     <ul class="side-list">
       <li><a href="{{ url_for('shop.catalog', q=q or None, sort=sort, all=1 if show_all else None) }}" {% if not category %}aria-current="true"{% endif %}>All <span>{{ categories|sum(attribute=1) }}</span></a></li>
-      {% for name, n in categories %}
-      <li><a href="{{ url_for('shop.catalog', q=q or None, category=name, sort=sort, all=1 if show_all else None) }}" {% if category == name %}aria-current="true"{% endif %}>{{ name }} <span>{{ n }}</span></a></li>
+      {% for name, n, tone in categories %}
+      <li data-tone="{{ tone }}"><a href="{{ url_for('shop.catalog', q=q or None, category=name, sort=sort, all=1 if show_all else None) }}" {% if category == name %}aria-current="true"{% endif %}>{{ name }} <span>{{ n }}</span></a></li>
       {% endfor %}
     </ul>
   </aside>

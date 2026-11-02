@@ -17,7 +17,7 @@ from ..services import orders as order_svc
 from ..services.orders import OrderError
 from ..services.paynow import PaynowClient, PaynowError, is_failed, is_paid, parse_message, verify_pairs
 from ..services.paypal import PayPalClient, PayPalError
-from ..services.specs import CATEGORY_ORDER, extract_specs, normalize_category, short_title, clean_text
+from ..services.specs import CATEGORY_ORDER, CATEGORY_TONE, extract_specs, normalize_category, short_title, clean_text
 
 shop_bp = Blueprint("shop", __name__)
 protect_blueprint(shop_bp, exempt=("shop.paynow_result",))  # Paynow's server callback has no session
@@ -64,28 +64,31 @@ def sweep_expired():
             current_app.logger.exception("Could not release expired orders")
 
 
-def image_url(product):
+def image_url(product, size="card"):
+    """Uniform 4:3 frame for a product photo (None if the photo file is missing)."""
     if product.image_filename:
-        path = os.path.join(current_app.config["UPLOAD_FOLDER"], product.image_filename)
+        path = os.path.join(current_app.config["UPLOAD_FOLDER"], os.path.basename(product.image_filename))
         if os.path.exists(path):
-            return url_for("static", filename=f"uploads/{product.image_filename}")
+            return url_for("shop.media", size=size, filename=os.path.basename(product.image_filename))
     return None
 
 
-def present(p):
+def present(p, size="card"):
     """Storefront view of a Product. Never exposes cost price or profit."""
     qty = p.quantity or 0
+    category = normalize_category(p.category)
     return {
         "id": p.id,
         "title": short_title(p.name),
         "full_name": clean_text(p.name),
         "brand": p.brand,
-        "category": normalize_category(p.category),
+        "category": category,
+        "tone": CATEGORY_TONE.get(category, "steel"),
         "price": p.price,
         "qty": qty,
         "in_stock": qty > 0,
         "low_stock": 0 < qty <= 2,
-        "image": image_url(p),
+        "image": image_url(p, size),
         "specs": extract_specs(p.name),
         "added": p.date_added,
     }
@@ -169,8 +172,20 @@ def home():
     counts = {}
     for r in rows:
         counts[r["category"]] = counts.get(r["category"], 0) + 1
-    categories = sorted(counts.items(), key=lambda kv: category_rank(kv[0]))
+    categories = [(n, c, CATEGORY_TONE.get(n, "steel"))
+                  for n, c in sorted(counts.items(), key=lambda kv: category_rank(kv[0]))]
     return render_template("shop/home.html", featured=featured, categories=categories, total=len(rows))
+
+
+@shop_bp.route("/media/<size>/<path:filename>")
+def media(size, filename):
+    """Cached, uniformly framed product photos."""
+    from ..services.images import get_frame_path
+    cache = os.path.join(current_app.instance_path, "thumbs")
+    path = get_frame_path(current_app.config["UPLOAD_FOLDER"], cache, size, filename)
+    if not path:
+        abort(404)
+    return send_file(path, mimetype="image/jpeg", max_age=60 * 60 * 24 * 7)
 
 
 @shop_bp.route("/shop")
@@ -207,7 +222,8 @@ def catalog():
     pages = max(1, -(-total // PAGE_SIZE))
     page = min(page, pages)
     rows = rows[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
-    categories = sorted(cat_counts.items(), key=lambda kv: category_rank(kv[0]))
+    categories = [(n, c, CATEGORY_TONE.get(n, "steel"))
+                  for n, c in sorted(cat_counts.items(), key=lambda kv: category_rank(kv[0]))]
     return render_template("shop/catalog.html", products=rows, q=q, category=category, sort=sort,
                            show_all=show_all, categories=categories, total=total, page=page, pages=pages)
 
@@ -215,7 +231,7 @@ def catalog():
 @shop_bp.route("/product/<int:product_id>")
 def product(product_id):
     p = visible_products().filter(Product.id == product_id).first_or_404()
-    view = present(p)
+    view = present(p, size="large")
     related = [present(r) for r in visible_products()
                .filter(Product.id != p.id, Product.quantity > 0).limit(60).all()
                if normalize_category(r.category) == view["category"]][:4]
@@ -528,27 +544,16 @@ def order_cancel(order_number):
 @shop_bp.route("/order/<order_number>/receipt.pdf")
 def order_receipt(order_number):
     order = order_for_request(order_number)
-    if order.payment_status != "paid":
+    if order.payment_status != "paid" or not order.receipt:
         abort(404)
-    from xhtml2pdf import pisa
-    items = [{"name": clean_text(i.product_name)[:90], "price": i.unit_price,
-              "quantity": i.quantity, "total_price": i.line_total} for i in order.items]
-    if order.delivery_fee:
-        items.append({"name": "Delivery", "price": order.delivery_fee, "quantity": 1, "total_price": order.delivery_fee})
-    html = render_template(
-        "receipt_template.html", items=items, subtotal=order.subtotal + order.delivery_fee, discount=0, tax=0,
-        total=order.total, receipt_number=order.receipt.receipt_number if order.receipt else order.order_number,
-        customer_name=order.customer_name, customer_email=order.customer_email, customer_phone=order.customer_phone,
-        printed_by="Online shop", business_name=current_app.config["BUSINESS_NAME"],
-        business_address=current_app.config["BUSINESS_ADDRESS"],
-        logo_path=os.path.join(current_app.static_folder, "images", "cthlogo.jpg"),
-        current_year=order.paid_at.year if order.paid_at else 2026, timestamp=order.paid_at or order.created_at,
-    )
-    buf = BytesIO()
-    if pisa.CreatePDF(html, dest=buf).err:
+    from ..utils.receipts import receipt_pdf
+    items = [{"name": clean_text(i.product_name)[:90], "price": i.unit_price, "quantity": i.quantity,
+              "original_total_price": i.line_total, "total_price": i.line_total} for i in order.items]
+    pdf = receipt_pdf(order.receipt, items, "Online shop")
+    if pdf is None:
         abort(500)
-    buf.seek(0)
-    return send_file(buf, as_attachment=True, download_name=f"receipt_{order.order_number}.pdf", mimetype="application/pdf")
+    return send_file(pdf, as_attachment=True, download_name=f"receipt_{order.order_number}.pdf",
+                     mimetype="application/pdf")
 
 
 @shop_bp.route("/track", methods=["GET", "POST"])

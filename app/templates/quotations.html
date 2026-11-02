@@ -1,0 +1,175 @@
+{% extends "staff/layout.html" %}
+{% set ep = 'admin' if current_user.role == 'admin' else 'cashier' %}
+{% block title %}Quotations{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ 'Edit quotation ' ~ edit_number if edit else 'Quotations' }}</h1>
+  <p>{{ 'Change the items or discount, then save.' if edit else 'Prepare a price quote, then convert it to a sale when the customer agrees.' }}</p></div>
+  {% if edit %}<a class="btn btn-ghost" href="{{ url_for(ep ~ '.quotations') }}">Back to all quotations</a>{% endif %}
+</div>
+
+<form method="POST" id="quoteForm" class="card" action="{{ url_for(ep ~ '.edit_quotation', quotation_id=edit_id) if edit else url_for(ep ~ '.quotations') }}">
+  <div class="card-header">{{ 'Quotation details' if edit else 'New quotation' }}</div>
+  <div class="card-body">
+    <label for="customer_name">Customer name</label>
+    <input type="text" id="customer_name" name="customer_name" required maxlength="100" placeholder="Who is this quote for?">
+
+    <label>Items</label>
+    <div class="table-responsive" style="margin-bottom:10px">
+      <table id="itemsTable">
+        <thead><tr><th style="min-width:260px">Product</th><th style="width:90px">Qty</th><th style="width:130px">Unit price</th><th class="r" style="width:120px">Line total</th><th style="width:60px"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button type="button" id="addRow" class="btn-ghost">Add item</button>
+
+    <div class="grid-2" style="margin-top:18px">
+      <div>
+        <label>Discount</label>
+        <div class="pay-row" style="grid-template-columns:auto 1fr;align-items:center">
+          <div class="seg"><label><input type="radio" name="discount_mode" value="amount" checked>$</label><label><input type="radio" name="discount_mode" value="percent">%</label></div>
+          <input type="number" name="discount_value" id="discountValue" min="0" step="0.01" value="0" style="margin:0" aria-label="Discount value">
+        </div>
+        <div class="hint">Saved as a dollar amount on the quotation.</div>
+      </div>
+      <div class="totals-box">
+        <div><span>Subtotal</span><span class="num" id="qSub">$0.00</span></div>
+        <div class="minus" id="qDiscRow" hidden><span>Discount</span><span class="num" id="qDisc"></span></div>
+        <div class="grand"><span>Total</span><span class="num" id="qTotal">$0.00</span></div>
+        <div id="qMsg" class="hint" style="color:var(--bad)" hidden></div>
+      </div>
+    </div>
+    <input type="hidden" name="items" id="itemsJson">
+    <div style="margin-top:14px"><button type="submit" class="btn-gold">{{ 'Save changes' if edit else 'Create quotation' }}</button></div>
+  </div>
+</form>
+
+{% if not edit %}
+<div class="card">
+  <div class="card-header">{{ 'All quotations' if ep == 'admin' else 'My quotations' }}</div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Number</th><th>Customer</th>{% if ep == 'admin' %}<th>By</th>{% endif %}<th>Date</th><th class="r">Total</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for q in quotations %}
+        <tr>
+          <td><b>{{ q.quotation_number }}</b></td>
+          <td>{{ q.customer_name or '-' }}</td>
+          {% if ep == 'admin' %}<td>{{ q.created_by.full_name if q.created_by else '-' }}</td>{% endif %}
+          <td>{{ q.created_at.strftime('%d %b %Y') if q.created_at else '' }}</td>
+          <td class="r num">${{ "%.2f"|format(q.total_price - (q.discount or 0)) }}{% if q.discount %}<div class="hint">after ${{ "%.2f"|format(q.discount) }} off</div>{% endif %}</td>
+          <td>{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}</td>
+          <td class="r" style="white-space:nowrap">
+            <a class="btn btn-ghost btn-sm" href="{{ url_for(ep ~ '.download_quotation', quotation_id=q.id) }}">PDF</a>
+            {% if not q.converted %}
+              <a class="btn btn-ghost btn-sm" href="{{ url_for(ep ~ '.edit_quotation', quotation_id=q.id) }}">Edit</a>
+              {% if ep == 'admin' or q.created_by_id == current_user.id %}
+              <button type="button" class="btn-gold btn-sm" onclick="openConvert({{ q.id }}, '{{ q.quotation_number }}', '{{ url_for(ep ~ '.convert_quotation', quotation_id=q.id) }}')">Convert to sale</button>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7"><div class="empty-state">No quotations yet.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal" id="convertModal">
+  <div class="modal-content">
+    <button type="button" class="close" onclick="closeConvert()" aria-label="Close">&times;</button>
+    <h3 id="convertTitle">Convert to sale</h3>
+    <p class="hint">Stock is taken and a receipt is created at the quoted prices and discount.</p>
+    <form method="POST" id="convertForm">
+      <label>Customer email (optional)</label><input type="email" name="customer_email">
+      <label>Customer phone (optional)</label><input type="text" name="customer_phone">
+      <label>Delivery fee (optional)</label><input type="number" name="delivery_fee" min="0" step="0.01" value="0">
+      <div class="modal-buttons"><button type="submit" class="btn-gold">Convert and download receipt</button><button type="button" class="btn-ghost" onclick="closeConvert()">Cancel</button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+const CATALOG = [
+{% for p in products %}  {id: {{ p.id }}, name: {{ p.name[:110]|tojson }}, price: {{ p.price }}, qty: {{ p.quantity }}},
+{% endfor %}];
+const EDIT = {{ (edit or none)|tojson }};
+const body = document.querySelector('#itemsTable tbody');
+const $ = id => document.getElementById(id);
+const money = n => '$' + n.toFixed(2);
+
+function addRow(item) {
+  const tr = document.createElement('tr');
+  const opts = '<option value="">Choose a product...</option>' +
+    CATALOG.map(p => `<option value="${p.id}" data-price="${p.price}">${p.name.replace(/</g,'&lt;')} (${p.qty} in stock)</option>`).join('') +
+    '<option value="__custom__">Custom item (not in stock list)</option>';
+  tr.innerHTML = `<td><select class="pid">${opts}</select><input type="text" class="cname" placeholder="Item name" hidden></td>
+    <td><input type="number" class="qty" min="1" step="1" value="1"></td>
+    <td><input type="number" class="price" min="0" step="0.01" value="0"></td>
+    <td class="r num line">$0.00</td>
+    <td><button type="button" class="btn-danger btn-sm rm" aria-label="Remove">&times;</button></td>`;
+  body.appendChild(tr);
+  const pid = tr.querySelector('.pid'), cname = tr.querySelector('.cname');
+  pid.addEventListener('change', () => {
+    const custom = pid.value === '__custom__';
+    cname.hidden = !custom;
+    const opt = pid.selectedOptions[0];
+    if (opt && opt.dataset.price) tr.querySelector('.price').value = opt.dataset.price;
+    update();
+  });
+  tr.querySelectorAll('input').forEach(i => i.addEventListener('input', update));
+  tr.querySelector('.rm').addEventListener('click', () => { tr.remove(); update(); });
+  if (item) {
+    if (item.product_id) pid.value = String(item.product_id); else { pid.value = '__custom__'; cname.hidden = false; cname.value = item.product_name; }
+    tr.querySelector('.qty').value = item.quantity; tr.querySelector('.price').value = item.unit_price;
+  }
+  update();
+}
+
+function rows() {
+  return [...body.querySelectorAll('tr')].map(tr => ({
+    product_id: tr.querySelector('.pid').value === '__custom__' ? null : (tr.querySelector('.pid').value || ''),
+    product_name: tr.querySelector('.cname').value,
+    quantity: parseInt(tr.querySelector('.qty').value) || 0,
+    unit_price: parseFloat(tr.querySelector('.price').value) || 0,
+    _tr: tr,
+  }));
+}
+
+function update() {
+  let sub = 0;
+  rows().forEach(r => { const t = r.quantity * r.unit_price; sub += t; r._tr.querySelector('.line').textContent = money(t); });
+  const mode = document.querySelector('input[name=discount_mode]:checked').value;
+  const dv = Math.max(0, parseFloat($('discountValue').value) || 0);
+  let disc = mode === 'percent' ? sub * dv / 100 : dv, msg = '';
+  if (mode === 'percent' && dv > 100) msg = 'A percentage can\u2019t be more than 100%.';
+  else if (disc > sub + 0.0001) msg = 'The discount can\u2019t be more than the subtotal.';
+  disc = Math.min(disc, sub);
+  $('qSub').textContent = money(sub);
+  $('qDiscRow').hidden = disc <= 0; $('qDisc').textContent = '\u2212' + money(disc);
+  $('qTotal').textContent = money(sub - disc);
+  $('qMsg').hidden = !msg; $('qMsg').textContent = msg;
+}
+
+$('addRow').addEventListener('click', () => addRow());
+document.querySelectorAll('#quoteForm input[name=discount_mode], #discountValue').forEach(i => i.addEventListener('input', update));
+$('quoteForm').addEventListener('submit', e => {
+  const list = rows().map(({_tr, ...r}) => r).filter(r => r.product_id !== '' || r.product_name);
+  if (!list.length) { e.preventDefault(); alert('Add at least one item.'); return; }
+  $('itemsJson').value = JSON.stringify(list);
+});
+
+if (EDIT) {
+  $('customer_name').value = EDIT.customer;
+  EDIT.items.forEach(addRow);
+  $('discountValue').value = EDIT.discount;
+} else { addRow(); }
+update();
+
+function openConvert(id, number, url) { $('convertTitle').textContent = 'Convert ' + number + ' to a sale'; $('convertForm').action = url; $('convertModal').style.display = 'flex'; }
+function closeConvert() { $('convertModal').style.display = 'none'; }
+</script>
+{% endblock %}

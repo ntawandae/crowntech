@@ -14,6 +14,11 @@ import os
 import json
 import secrets
 from werkzeug.security import generate_password_hash
+from .. import login_manager
+from ..services import pos, quotes
+from ..services.pos import PricingError, SaleError
+from ..utils.receipts import receipt_items, receipt_pdf, render_pdf, static_link_callback
+from ..utils.timeutil import day_range, zim_now, zim_today
 
 # ----------------------------------------------------------------------
 # TIMEZONE HELPER – Zimbabwe (UTC+2, no DST)
@@ -21,26 +26,21 @@ from werkzeug.security import generate_password_hash
 ZIM_OFFSET = timedelta(hours=2)  # Zimbabwe is UTC+2
 
 def get_utc_range_for_zim_date(zim_date: date):
-    """
-    Returns the UTC datetime range covering 00:00:00 to 23:59:59.999999
-    Zimbabwe local time for the given business date.
-    """
-    start_local = datetime.combine(zim_date, datetime.min.time())
-    end_local   = datetime.combine(zim_date, datetime.max.time())
-    start_utc   = start_local - ZIM_OFFSET
-    end_utc     = end_local   - ZIM_OFFSET
-    return start_utc, end_utc
+    """Start/end of a Zimbabwe business day. (Name kept for older callers. Stored times are Zimbabwe
+    local time, so this is a plain local-day range - it no longer shifts by 2 hours, which is what
+    pushed late-evening sales onto the next day's report.)"""
+    return day_range(zim_date)
 
 # ----------------------------------------------------------------------
 # Backfill & Balance Correction – Uses Zimbabwe day ranges
 # ----------------------------------------------------------------------
 def backfill_balances_until_today():
     """Recompute and correct DailyCashBalance records up to today using Zimbabwe business days."""
-    today = datetime.utcnow().date()
+    today = zim_now().date()
     all_balances = DailyCashBalance.query.order_by(DailyCashBalance.date.asc()).all()
 
     if not all_balances:
-        first = DailyCashBalance(date=today, opening_balance=0.0, closing_balance=0.0, updated_at=datetime.utcnow())
+        first = DailyCashBalance(date=today, opening_balance=0.0, closing_balance=0.0, updated_at=zim_now())
         db.session.add(first)
         db.session.commit()
         logger.info(f"Initialized first balance for {today}")
@@ -62,7 +62,7 @@ def backfill_balances_until_today():
         if abs(balance.opening_balance - expected_opening) > 0.01 or abs(balance.closing_balance - expected_closing) > 0.01:
             balance.opening_balance = round(expected_opening, 2)
             balance.closing_balance = round(expected_closing, 2)
-            balance.updated_at = datetime.utcnow()
+            balance.updated_at = zim_now()
             db.session.commit()
             logger.info(f"Corrected {day}: Open={expected_opening:.2f}, Close={expected_closing:.2f}")
 
@@ -78,7 +78,7 @@ def backfill_balances_until_today():
             date=current_date,
             opening_balance=round(prev_closing, 2),
             closing_balance=round(prev_closing, 2),
-            updated_at=datetime.utcnow()
+            updated_at=zim_now()
         )
         db.session.add(new_balance)
         db.session.commit()
@@ -120,27 +120,16 @@ def validate_date(date_obj):
         return None
 
 def update_cash_balance(local_date, sales_amount=0.0, income_amount=0.0, expense_amount=0.0):
+    """Rebuild that day's balance from the records (the amounts are ignored: the records are the truth)."""
     try:
-        balance = DailyCashBalance.query.filter_by(date=local_date).first()
-        if not balance:
-            prev_day = local_date - timedelta(days=1)
-            prev = DailyCashBalance.query.filter_by(date=prev_day).first()
-            opening = round(prev.closing_balance if prev else 0.0, 2)
-            balance = DailyCashBalance(date=local_date, opening_balance=opening, closing_balance=opening)
-            db.session.add(balance)
-
-        net_flow = sales_amount + income_amount - expense_amount
-        balance.closing_balance = round(balance.opening_balance + net_flow, 2)
-        balance.updated_at = datetime.utcnow()
-        db.session.commit()
-        logger.debug(f"Updated balance {local_date}: +{net_flow:.2f} → Close={balance.closing_balance:.2f}")
+        pos.recompute_day(local_date)
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating cash balance {local_date}: {str(e)}")
 
 def calculate_cumulative_balances(selected_date):
     try:
-        selected_date = selected_date if isinstance(selected_date, date) else date.today()
+        selected_date = selected_date if isinstance(selected_date, date) else zim_today()
         start_utc, end_utc = get_utc_range_for_zim_date(selected_date)
         prev_day = selected_date - timedelta(days=1)
         prev_balance = DailyCashBalance.query.filter_by(date=prev_day).first()
@@ -179,13 +168,13 @@ def admin_dashboard():
     backfill_balances_until_today()
 
     view = request.form.get("view", request.args.get("view", "overview"))
-    selected_date_str = request.form.get("selected_date", request.args.get("selected_date", datetime.utcnow().strftime('%Y-%m-%d')))
+    selected_date_str = request.form.get("selected_date", request.args.get("selected_date", zim_now().strftime('%Y-%m-%d')))
     range_type = request.form.get("range_type", request.args.get("range_type", "daily"))  # NEW: daily or monthly
 
     try:
         base_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
     except ValueError:
-        base_date = datetime.utcnow().date()
+        base_date = zim_now().date()
         flash("Invalid date format, defaulting to today.", "warning")
 
     # Determine date range based on view type
@@ -248,7 +237,7 @@ def admin_dashboard():
     incomes = ExtraIncome.query.filter(ExtraIncome.timestamp.between(start_utc, end_utc)).order_by(ExtraIncome.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
     # Stock/defect requests – same cutoff logic, but full period
-    cutoff_date = datetime.utcnow() - timedelta(days=3)  # longer for monthly
+    cutoff_date = zim_now() - timedelta(days=3)  # longer for monthly
     stock_requests = StockRequest.query.filter(
         (StockRequest.status == 'pending') | (StockRequest.timestamp >= cutoff_date)
     ).order_by(StockRequest.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
@@ -281,7 +270,7 @@ def admin_dashboard():
     if request.method == "POST" and request.form.get("action") == "export_pdf":
         try:
             html = render_template(
-                "admin_report_pdf.html",
+                "report_pdf.html",
                 sales=sales.items,
                 expenses=expenses.items,
                 incomes=incomes.items,
@@ -297,10 +286,11 @@ def admin_dashboard():
                 closing_balance=closing_balance,
                 date=title_date,  # e.g., "February 2026" or single date
                 range_type=range_type,
+                current_range=range_type,
                 logo_path=url_for("static", filename="images/cthlogo.jpg", _external=True)
             )
             buffer = BytesIO()
-            pisa.CreatePDF(html, dest=buffer)
+            pisa.CreatePDF(html, dest=buffer, link_callback=static_link_callback)
             buffer.seek(0)
             filename = f"admin_report_{title_date.replace(' ', '_')}.pdf"
             return send_file(buffer, as_attachment=True, download_name=filename, mimetype="application/pdf")
@@ -430,7 +420,7 @@ def add_stock():
             return redirect(url_for('admin.add_stock'))
 
     products = Product.query.order_by(Product.name).all()
-    summary = calculate_cumulative_balances(date.today())
+    summary = calculate_cumulative_balances(zim_today())
     summary = {
         "opening_balance": round(summary[0], 2),
         "total_sales": round(summary[1], 2),
@@ -454,7 +444,7 @@ def add_stock():
         sales_data=[],
         expense_data=[],
         income_data=[],
-        selected_date=date.today(),
+        selected_date=zim_today(),
         report_page=False
     )
 
@@ -554,11 +544,11 @@ def record_expense():
         flash("Please provide valid expense details.", "danger")
         return redirect(url_for('admin.admin_dashboard', view='expenses'))
 
-    new_exp = Expense(description=description, amount=amount, recorded_by=current_user.id, timestamp=datetime.utcnow())
+    new_exp = Expense(description=description, amount=amount, recorded_by=current_user.id, timestamp=zim_now())
     db.session.add(new_exp)
     db.session.commit()
 
-    update_cash_balance(date.today(), expense_amount=amount)
+    update_cash_balance(zim_today(), expense_amount=amount)
     flash("Expense recorded.", "success")
     return redirect(url_for('admin.admin_dashboard', view='expenses'))
 
@@ -581,7 +571,7 @@ def approve_stock_request(request_id):
     product.quantity += req.quantity
     req.status = 'approved'
     req.approved_by = current_user.id
-    req.approved_at = datetime.utcnow()
+    req.approved_at = zim_now()
 
     try:
         db.session.commit()
@@ -606,7 +596,7 @@ def reject_stock_request(request_id):
 
     req.status = 'rejected'
     req.approved_by = current_user.id
-    req.rejected_at = datetime.utcnow()
+    req.rejected_at = zim_now()
     db.session.commit()
     flash(f"Stock request for {req.product.name} rejected.", "info")
     return redirect(url_for('admin.admin_dashboard', view='requests'))
@@ -629,7 +619,7 @@ def approve_defect(request_id):
 
     product.quantity -= defect.quantity
     defect.status = 'Approved'
-    defect.approved_at = datetime.utcnow()
+    defect.approved_at = zim_now()
     db.session.commit()
     flash(f"Defect request for {product.name} approved.", "success")
     return redirect(url_for('admin.admin_dashboard', view='defects'))
@@ -646,7 +636,7 @@ def reject_defect(request_id):
         return redirect(url_for('admin.admin_dashboard', view='defects'))
 
     defect.status = 'Rejected'
-    defect.rejected_at = datetime.utcnow()
+    defect.rejected_at = zim_now()
     db.session.commit()
     flash(f"Defect request for {defect.product.name} rejected.", "info")
     return redirect(url_for('admin.admin_dashboard', view='defects'))
@@ -665,7 +655,7 @@ def return_defect(request_id):
     product = defect.product
     product.quantity += defect.quantity
     defect.status = 'Returned'
-    defect.returned_at = datetime.utcnow()
+    defect.returned_at = zim_now()
     db.session.commit()
     flash(f"{defect.quantity} units of {product.name} returned to stock.", "success")
     return redirect(url_for('admin.admin_dashboard', view='defects'))
@@ -676,14 +666,13 @@ def export_report_pdf():
     if current_user.role != 'admin':
         abort(403)
 
-    selected_date = request.form.get('selected_date', datetime.utcnow().strftime('%Y-%m-%d'))
+    selected_date = request.form.get('selected_date', zim_now().strftime('%Y-%m-%d'))
     selected_date = validate_date(selected_date)
     if not selected_date:
-        selected_date = date.today()
+        selected_date = zim_today()
         flash("Invalid date for PDF export, using today.", "warning")
 
-    start = datetime.combine(selected_date, datetime.min.time()) - timedelta(hours=8)
-    end = datetime.combine(selected_date, datetime.max.time()) - timedelta(hours=8)
+    start, end = day_range(selected_date)
 
     sales = Sale.query.filter(Sale.timestamp.between(start, end)).all()
     expenses = Expense.query.filter(Expense.timestamp.between(start, end)).all()
@@ -712,6 +701,10 @@ def export_report_pdf():
         stock_requests=stock_requests,
         defect_requests=defect_requests,
         current_range='Daily',
+        total_sales=summary['total_sales'],
+        total_expenses=summary['total_expenses'],
+        total_profit=summary['total_profit'],
+        date=selected_date.strftime('%Y-%m-%d'),
         selected_date=selected_date.strftime('%Y-%m-%d'),
         logo_path=url_for('static', filename='images/cthlogo.jpg', _external=True)
     )
@@ -734,248 +727,106 @@ def export_report_pdf():
 @admin_bp.route('/quotations', methods=['GET', 'POST'])
 @login_required
 def quotations():
-    if current_user.role != 'admin':
-        abort(403)
+    if request.method == 'POST':
+        try:
+            customer, items, discount = quotes.parse_quote_form(request.form)
+            q = quotes.save_quotation(current_user, customer, items, discount)
+            flash(f"Quotation {q.quotation_number} created.", "success")
+        except PricingError as exc:
+            flash(str(exc), "danger")
+        except Exception:
+            db.session.rollback()
+            logger.exception("Error creating quotation")
+            flash("The quotation could not be saved. Please try again.", "danger")
+        return redirect(url_for('admin.quotations'))
+
+    products = Product.query.order_by(Product.name).all()
+    everything = Quotation.query.order_by(Quotation.created_at.desc()).all()
+    return render_template('quotations.html', products=products, quotations=everything, edit=None)
+
+
+@admin_bp.route('/quotations/<int:quotation_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_quotation(quotation_id):
+    quotation = Quotation.query.get_or_404(quotation_id)
+    if quotation.converted:
+        flash("A converted quotation can't be edited.", "warning")
+        return redirect(url_for('admin.quotations'))
 
     if request.method == 'POST':
         try:
-            customer_name = request.form.get('customer_name', '').strip()
-            discount = float(request.form.get('discount_value', 0))
-            items_json = request.form.get('items')
-            items = json.loads(items_json) if items_json else []
-
-            if not items or not customer_name:
-                flash("Please provide customer name and at least one item.", "danger")
-                return redirect(url_for('admin.quotations'))
-
-            for item in items:
-                product_id = item.get('product_id')
-                if not product_id:
-                    flash(f"Invalid item: {item.get('product_name', 'Unknown')} must be associated with a product.", "danger")
-                    return redirect(url_for('admin.quotations'))
-                product = Product.query.get(product_id)
-                if not product:
-                    flash(f"Product ID {product_id} does not exist.", "danger")
-                    return redirect(url_for('admin.quotations'))
-
-            quotation_number = generate_quotation_number()
-            quotation = Quotation(
-                quotation_number=quotation_number,
-                customer_name=customer_name,
-                created_by_id=current_user.id,
-                discount=discount,
-                created_at=datetime.utcnow()
-            )
-            db.session.add(quotation)
-            db.session.flush()
-
-            for item in items:
-                product_id = item.get('product_id')
-                product = Product.query.get(product_id)
-                qitem = QuotationItem(
-                    quotation_id=quotation.id,
-                    product_id=product_id,
-                    product_name=product.name,
-                    quantity=int(item.get('quantity', 1)),
-                    unit_price=float(item.get('unit_price')),
-                    total_price=float(item.get('quantity', 1)) * float(item.get('unit_price'))
-                )
-                db.session.add(qitem)
-
-            db.session.commit()
-            flash(f"Quotation {quotation_number} created successfully!", "success")
+            customer, items, discount = quotes.parse_quote_form(request.form)
+            quotes.save_quotation(current_user, customer, items, discount, quotation=quotation)
+            flash(f"Quotation {quotation.quotation_number} updated.", "success")
             return redirect(url_for('admin.quotations'))
-
-        except (ValueError, json.JSONDecodeError) as e:
+        except PricingError as exc:
+            flash(str(exc), "danger")
+        except Exception:
             db.session.rollback()
-            flash(f"Error creating quotation: Invalid input data.", "danger")
-            return redirect(url_for('admin.quotations'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error creating quotation: {str(e)}", "danger")
-            return redirect(url_for('admin.quotations'))
+            logger.exception("Error updating quotation")
+            flash("The quotation could not be saved. Please try again.", "danger")
+        return redirect(url_for('admin.edit_quotation', quotation_id=quotation.id))
 
-    products = Product.query.all()
-    quotations = Quotation.query.order_by(Quotation.created_at.desc()).all()
-    summary = calculate_cumulative_balances(date.today())
-    summary = {
-        "opening_balance": round(summary[0], 2),
-        "total_sales": round(summary[1], 2),
-        "total_income": round(summary[2], 2),
-        "total_expenses": round(summary[3], 2),
-        "total_profit": round(summary[4], 2),
-        "net_cash_flow": round(summary[5], 2),
-        "net_profit": round(summary[6], 2),
-        "closing_balance": round(summary[7], 2)
-    }
-    return render_template(
-        'admin_dashboard.html',
-        products=products,
-        quotations=quotations,
-        view='quotations',
-        summary=summary,
-        report_page=False,
-        selected_date=date.today()
-    )
+    products = Product.query.order_by(Product.name).all()
+    everything = Quotation.query.order_by(Quotation.created_at.desc()).all()
+    return render_template('quotations.html', products=products, quotations=everything,
+                           edit=quotes.quotation_edit_payload(quotation), edit_id=quotation.id,
+                           edit_number=quotation.quotation_number)
 
 @admin_bp.route('/quotations/<int:quotation_id>/convert', methods=['POST'])
 @login_required
 def convert_quotation(quotation_id):
-    if current_user.role != 'admin':
-        abort(403)
-
+    quotation = Quotation.query.get_or_404(quotation_id)
     try:
-        quotation = Quotation.query.get_or_404(quotation_id)
-        if quotation.converted:
-            flash("This quotation has already been converted to a sale.", "warning")
-            return redirect(url_for('admin.quotations'))
-
-        for q_item in quotation.items:
-            if not q_item.product_id:
-                flash(f"Invalid item: {q_item.product_name} must be associated with a product.", "danger")
-                return redirect(url_for('admin.quotations'))
-            product = Product.query.get(q_item.product_id)
-            if not product:
-                flash(f"Product '{q_item.product_name}' no longer exists.", "danger")
-                return redirect(url_for('admin.quotations'))
-            if product.quantity < q_item.quantity:
-                flash(f"Not enough stock for '{product.name}'. Requested: {q_item.quantity}, Available: {product.quantity}.", "danger")
-                return redirect(url_for('admin.quotations'))
-            if product.cost_price is None:
-                logger.warning(f"Product {product.name} (ID: {q_item.product_id}) has None cost_price. Setting to 0.0 for profit calculation.")
-                product.cost_price = 0.0
-
-        sold_items = []
-        subtotal = 0
-        for q_item in quotation.items:
-            product = Product.query.get(q_item.product_id)
-            total_price = q_item.unit_price * q_item.quantity
-            cost_price = float(product.cost_price) if product.cost_price is not None else 0.0
-            profit = (q_item.unit_price - cost_price) * q_item.quantity
-            logger.debug(f"Converting quotation item: product={product.name}, unit_price={q_item.unit_price}, cost_price={cost_price}, quantity={q_item.quantity}, profit={profit}")
-            subtotal += total_price
-            sold_items.append({
-                'name': product.name,
-                'price': q_item.unit_price,
-                'quantity': q_item.quantity,
-                'total_price': total_price,
-                'profit': profit
-            })
-
-        tax_rate = 0.0
-        tax = subtotal * tax_rate
-        total = subtotal - (quotation.discount or 0.0) + tax
-
-        today = datetime.utcnow().strftime('%Y%m%d')
-        prefix = f"SALE-{today}-"
-        last_receipt = Receipt.query.filter(Receipt.receipt_number.like(f"{prefix}%")).order_by(Receipt.receipt_number.desc()).first()
-        receipt_number = f"{prefix}{int(last_receipt.receipt_number.split('-')[-1]) + 1:04d}" if last_receipt else f"{prefix}0001"
-
-        max_retries = 5
-        retry_count = 0
-        while Receipt.query.filter_by(receipt_number=receipt_number).first() and retry_count < max_retries:
-            retry_count += 1
-            last_number = int(receipt_number.split('-')[-1]) + 1
-            receipt_number = f"{prefix}{last_number:04d}"
-
-        if retry_count >= max_retries:
-            flash("Unable to generate a unique receipt number.", "danger")
-            return redirect(url_for('admin.quotations'))
-
-        receipt = Receipt(
-            receipt_number=receipt_number,
-            subtotal=subtotal,
-            tax=tax,
-            total=total,
-            customer_name=quotation.customer_name,
+        result = quotes.convert_to_sale(
+            quotation, current_user,
             customer_email=request.form.get('customer_email', ''),
             customer_phone=request.form.get('customer_phone', ''),
-            cashier_id=current_user.id,
-            timestamp=datetime.utcnow()
-        )
-        db.session.add(receipt)
-        db.session.flush()
-
-        for q_item in quotation.items:
-            product = Product.query.get(q_item.product_id)
-            total_price = q_item.unit_price * q_item.quantity
-            cost_price = float(product.cost_price) if product.cost_price is not None else 0.0
-            profit = (q_item.unit_price - cost_price) * q_item.quantity
-            sale = Sale(
-                product_id=q_item.product_id,
-                quantity=q_item.quantity,
-                total_price=total_price,
-                profit=profit,
-                cashier_id=current_user.id,
-                timestamp=datetime.utcnow(),
-                receipt_id=receipt.id
-            )
-            db.session.add(sale)
-            product.quantity -= q_item.quantity
-            logger.debug(f"Created sale: product={product.name}, total_price={total_price}, profit={profit}")
-
-        quotation.converted = True
-        db.session.commit()
-
-        update_cash_balance(date.today(), sales_amount=total)
-
-        pdf = generate_pdf('receipt_template.html', {
-            'items': sold_items,
-            'subtotal': subtotal,
-            'tax': tax,
-            'total': total,
-            'discount': quotation.discount or 0.0,
-            'receipt_number': receipt_number,
-            'customer_name': quotation.customer_name,
-            'customer_email': receipt.customer_email,
-            'customer_phone': receipt.customer_phone,
-            'printed_by': current_user.full_name,
-            'business_name': 'Crown Tech Hub',
-            'business_address': 'Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25, Harare, Zimbabwe',
-            'logo_path': url_for('static', filename='images/cthlogo.jpg', _external=True),
-            'current_year': datetime.utcnow().year
-        })
-
-        flash(f"Quotation {quotation.quotation_number} converted to sale. Receipt #{receipt_number} generated.", "success")
-        return send_file(
-            pdf,
-            as_attachment=True,
-            download_name=f"receipt_{receipt_number}.pdf",
-            mimetype='application/pdf'
-        )
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error converting quotation ID {quotation_id}: {str(e)}")
-        flash(f"Error converting quotation: {str(e)}", "danger")
+            delivery_fee=request.form.get('delivery_fee') or 0)
+    except (PricingError, SaleError) as exc:
+        flash(str(exc), "danger")
         return redirect(url_for('admin.quotations'))
+    except Exception:
+        db.session.rollback()
+        logger.exception("Error converting quotation")
+        flash("Something went wrong converting that quotation. Nothing was changed.", "danger")
+        return redirect(url_for('admin.quotations'))
+
+    receipt = result['receipt']
+    flash(f"Quotation {quotation.quotation_number} converted. Receipt #{receipt.receipt_number} recorded.", "success")
+    pdf = receipt_pdf(receipt, result['items'], current_user.full_name)
+    if pdf is None:
+        flash("The receipt PDF could not be created: reprint it from Sales.", "warning")
+        return redirect(url_for('admin.quotations'))
+    return send_file(pdf, as_attachment=True, download_name=f"receipt_{receipt.receipt_number}.pdf",
+                     mimetype='application/pdf')
 
 @admin_bp.route('/download_quotation/<int:quotation_id>')
 @login_required
 def download_quotation(quotation_id):
-    if current_user.role != 'admin':
-        abort(403)
-
-    try:
-        quotation = Quotation.query.get_or_404(quotation_id)
-        pdf = generate_pdf('print_quotation.html', {
-            'quotation': quotation,
-            'business_name': "Crown Tech Hub",
-            'business_address': "Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25",
-            'printed_by': current_user.full_name,
-            'logo_path': url_for('static', filename='images/cthlogo.jpg', _external=True)
-        })
-
-        return send_file(
-            pdf,
-            as_attachment=True,
-            download_name=f"quotation_{quotation.quotation_number}.pdf",
-            mimetype='application/pdf'
-        )
-
-    except Exception as e:
-        flash(f"Error generating PDF: {str(e)}", "danger")
+    quotation = Quotation.query.get_or_404(quotation_id)
+    pdf = render_pdf('print_quotation.html', quotation=quotation,
+                     business_name=current_app.config['BUSINESS_NAME'],
+                     business_address=current_app.config['BUSINESS_ADDRESS'],
+                     printed_by=current_user.full_name,
+                     logo_path=url_for('static', filename='images/cthlogo.jpg'))
+    if pdf is None:
+        flash("Failed to generate the quotation PDF.", "danger")
         return redirect(url_for('admin.quotations'))
+    return send_file(pdf, as_attachment=True, download_name=f"quotation_{quotation.quotation_number}.pdf",
+                     mimetype='application/pdf')
+
+
+@admin_bp.route('/receipt/<int:receipt_id>/pdf')
+@login_required
+def reprint_receipt(receipt_id):
+    receipt = Receipt.query.get_or_404(receipt_id)
+    pdf = receipt_pdf(receipt, receipt_items(receipt), current_user.full_name)
+    if pdf is None:
+        flash("Could not create the receipt PDF.", "danger")
+        return redirect(url_for('admin.view_sales'))
+    return send_file(pdf, as_attachment=True, download_name=f"receipt_{receipt.receipt_number}.pdf",
+                     mimetype='application/pdf')
 
 @admin_bp.route('/download_catalog')
 @login_required
@@ -1006,7 +857,7 @@ def download_catalog():
             'business_address': "Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25",
             'business_contact': "Phone: +263774659090 | +263782896646 | +263778329323 | Email: crowntechzw@gmail.com",
             'logo_path': url_for('static', filename='images/cthlogo.jpg', _external=True),
-            'current_year': datetime.utcnow().year
+            'current_year': zim_now().year
         })
 
         return send_file(
@@ -1048,8 +899,8 @@ def download_stock_list():
             'business_address': "Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25",
             'business_contact': "Phone: +263774659090 | +263782896646 | +263778329323 | Email: crowntechzw@gmail.com",
             'logo_path': url_for('static', filename='images/cthlogo.jpg', _external=True),
-            'current_year': datetime.utcnow().year,
-            'current_date': datetime.utcnow().strftime('%Y-%m-%d')
+            'current_year': zim_now().year,
+            'current_date': zim_now().strftime('%Y-%m-%d')
         })
 
         return send_file(
@@ -1071,7 +922,7 @@ def view_sales():
     if current_user.role != 'admin':
         abort(403)
 
-    today = datetime.utcnow().date()
+    today = zim_now().date()
     date_filter = request.args.get('date', today.strftime('%Y-%m-%d'))
     search_query = request.args.get('search', '').strip()
 
@@ -1139,7 +990,7 @@ def reverse_sale(sale_id):
 
     amount_reversed = sale.total_price
     balance.closing_balance = max(balance.closing_balance - amount_reversed, 0.0)
-    balance.updated_at = datetime.utcnow()
+    balance.updated_at = zim_now()
     db.session.add(balance)
 
     # Step 3 — Log reversal
@@ -1270,3 +1121,11 @@ def unlock_profile(user_id):
     flash(f"{profile.user.full_name}'s profile is now editable.", "success")
     return redirect(url_for("admin.users"))
 
+
+@admin_bp.before_request
+def require_admin():
+    """Blanket rule for this whole blueprint: admins only. (Route-level checks stay as a second lock.)"""
+    if not current_user.is_authenticated:
+        return login_manager.unauthorized()
+    if current_user.role != 'admin':
+        abort(403)

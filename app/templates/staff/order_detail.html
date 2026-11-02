@@ -1,4 +1,4 @@
-{% extends 'staff/base.html' %}
+{% extends "staff/layout.html" %}
 {% block title %}{{ order.order_number }}{% endblock %}
 {% block content %}
 <p class="small"><a href="{{ url_for('staff_orders.order_list') }}">&larr; All online orders</a></p>

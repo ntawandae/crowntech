@@ -28,8 +28,8 @@ on first start; no existing table or row is changed.
    profit and daily reports. Receipt numbers look like `WEB-CTH-ABC234`.
 5. Staff mark the order ready, then collected/delivered. Cancelling returns stock.
 
-Online payments land in your Paynow/PayPal accounts, so they are **not** added to the till's
-daily cash balance.
+Online sales are counted in your sales, profit and daily balance like any other sale (the daily
+balance is rebuilt from all recorded sales, income and expenses).
 
 ## Paynow
 1. Paynow dashboard > My Account > Integrations: create an integration, copy the ID and key.
@@ -53,9 +53,22 @@ A method only appears at checkout when its credentials are set.
 * Back up `instance/inventory.db` regularly (SQLite). Consider PostgreSQL if traffic grows.
 * Run `python tests/test_services.py` after any change to the payment code.
 
-## Known issues in the original code (not changed, worth fixing next)
-* `admin_quotations.html` links to `admin.edit_quotation`, which doesn't exist: the admin quotations page will error when it lists a quotation.
-* Staff contract uploads are saved under `static/`, which is publicly downloadable by URL.
-* Staff forms (admin/cashier) have no CSRF protection; the new storefront and order pages do.
-* Cashier sales store Zimbabwe local time while reports query a UTC range, so sales after about 22:00 can land on the next day.
-* The cashier panel's debug logging prints cart and form data; turn it down for production.
+## Till: discounts and delivery fee
+* Discount can be a $ amount or a percentage. It is checked on the server (never negative, never more than
+  the subtotal, percentages 0-100). Set `CASHIER_MAX_DISCOUNT_PERCENT` to cap what cashiers can give.
+* The discount is shared across the items to the cent, so each sale line and its profit are exact.
+  (Before, profit ignored discounts.)
+* A delivery fee can be added to any sale, with an optional address. It is on the receipt, included in the
+  total, and booked as extra income ("Delivery fee - receipt number") so reports pick it up.
+* Reversing a sale line returns stock but does not reverse the delivery fee; adjust that income manually.
+
+## Time
+All sale, receipt, expense and income times are stored in Zimbabwe local time (UTC+2). Reports use the plain
+local day, so a sale at 23:00 appears on that day. Old records are not changed.
+
+## Contracts
+Contract files now live in `instance/contracts/` (not under `static/`) and are served only to the owner or
+an admin. Any old files found in `static/uploads/contracts` are moved there on first start.
+
+## Tests
+`python tests/test_services.py` - payment clients, pricing, discount sharing, product text helpers.

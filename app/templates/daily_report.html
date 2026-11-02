@@ -1,123 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Report</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: #f4f4f4;
-            padding-bottom: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin-top: 20px;
-            padding: 0 15px;
-        }
-        .card {
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-        }
-        .card-header {
-            background: #1e3a8a;
-            color: white;
-            font-weight: bold;
-            font-size: 1.1rem;
-            padding: 10px 15px;
-        }
-        .table {
-            font-size: 0.9rem;
-        }
-        .table th {
-            background: #3b82f6;
-            color: white;
-        }
-        .summary {
-            background: #d1fae5;
-            padding: 15px;
-            border-radius: 5px;
-        }
-        .summary p {
-            font-weight: bold;
-            margin-bottom: 10px;
-            font-size: 1rem;
-        }
-        .date-picker-section {
-            background: #ffffff;
-            border: 2px solid #3b82f6;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        .date-picker-section label {
-            font-weight: bold;
-            font-size: 1.1rem;
-            color: #1e3a8a;
-            margin-bottom: 8px;
-            display: block;
-        }
-        .date-picker-section .input-group {
-            max-width: 100%;
-        }
-        .date-picker-section .form-control {
-            font-size: 1.1rem;
-            padding: 10px;
-            border-color: #3b82f6;
-        }
-        .date-picker-section .btn {
-            font-size: 1rem;
-            padding: 10px 20px;
-            margin: 5px 5px 0 0;
-            white-space: nowrap;
-        }
-        canvas {
-            max-width: 100%;
-            height: auto !important;
-            min-height: 250px;
-        }
-        .pagination {
-            justify-content: center;
-        }
-        @media (max-width: 576px) {
-            .container {
-                padding: 0 10px;
-            }
-            .card-header {
-                font-size: 1rem;
-            }
-            .table {
-                font-size: 0.8rem;
-            }
-            .summary p {
-                font-size: 0.9rem;
-            }
-            .date-picker-section label {
-                font-size: 1rem;
-            }
-            .date-picker-section .form-control {
-                font-size: 1rem;
-                width: 100%;
-                padding: 8px;
-            }
-            .date-picker-section .btn {
-                font-size: 0.9rem;
-                padding: 8px 15px;
-                width: 100%;
-                margin: 5px 0;
-            }
-            h2 {
-                font-size: 1.25rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    {% include 'cashier_base.html' %}
+{% extends "staff/layout.html" %}
+{% block title %}Daily report{% endblock %}
+{% block head_pre %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+    
     <div class="container">
         <h2 class="mt-4 text-center text-md-start">Daily Report for {{ date }}</h2>
         <div class="date-picker-section">
@@ -161,6 +51,7 @@
                         <tbody>
                             {% for sale in sales.items %}
                             <tr>
+                                <td>{% if sale.receipt %}<a href="{{ url_for('cashier.reprint_receipt', receipt_id=sale.receipt.id) }}" title="Download receipt PDF">{{ sale.receipt.receipt_number }}</a>{% else %}N/A{% endif %}</td>
                                 <td>{{ sale.product.name }}</td>
                                 <td>{{ sale.quantity }}</td>
                                 <td>${{ "%.2f"|format(sale.total_price) }}</td>
@@ -332,5 +223,4 @@
             });
         </script>
     </div>
-</body>
-</html>
+{% endblock %}

@@ -1,7 +1,7 @@
-{% extends 'staff/base.html' %}
+{% extends "staff/layout.html" %}
 {% block content %}
 <div class="section-head">
-  <h1 style="font-size:1.8rem;margin:0">Online orders</h1>
+  <div><h1 style="margin:0">Online orders</h1><p class="muted" style="margin:4px 0 0">Orders placed on the shop, with their payment status.</p></div>
   <form method="get" class="actions">
     <input type="hidden" name="filter" value="{{ flt }}">
     <input type="search" name="q" value="{{ q }}" placeholder="Order number, name, phone or email" style="width:300px" aria-label="Search orders">

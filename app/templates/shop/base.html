@@ -15,6 +15,11 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 {% block header %}
+<div class="promo"><div class="wrap">
+  <span>Pay with Paynow, PayPal or at the shop</span>
+  <span>Collect in store or get it delivered</span>
+  {% if biz.whatsapp %}<a href="https://wa.me/{{ biz.whatsapp }}">Order on WhatsApp</a>{% endif %}
+</div></div>
 <header class="site-head">
   <div class="wrap head-row">
     <a class="brand" href="{{ url_for('shop.home') }}">

@@ -1,10 +1,11 @@
-from flask import Blueprint, render_template, redirect, request, flash, url_for
+from flask import abort, current_app, send_file, Blueprint, render_template, redirect, request, flash, url_for
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from ..models import User, UserProfile
 from .. import db
 from ..security import clear_failures, client_key, record_failure, safe_next, throttled
 from werkzeug.utils import secure_filename
+import secrets
 import os
 from datetime import datetime  # Added for date parsing
 
@@ -58,6 +59,8 @@ def logout():
 @auth_bp.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
+    if current_user.role == 'customer':
+        return redirect(url_for('shop.account'))
     # Ensure UserProfile exists
     profile = current_user.profile
     if not profile:
@@ -73,6 +76,10 @@ def profile():
 
         if not check_password_hash(current_user.password, old_password):
             flash("Old password is incorrect.", "danger")
+            return redirect(url_for("auth.profile"))
+
+        if len(new_password) < 8:
+            flash("Choose a new password with at least 8 characters.", "danger")
             return redirect(url_for("auth.profile"))
 
         if new_password != confirm_password:
@@ -111,16 +118,20 @@ def profile():
         profile.next_of_kin_contact = request.form.get("next_of_kin_contact") or None
         profile.next_of_kin_address = request.form.get("next_of_kin_address") or None
 
-        # Contract file upload
+        # Contract file upload - stored privately (not under /static) and served only to the
+        # owner or an admin through auth.contract.
         if "contract_file" in request.files:
             file = request.files["contract_file"]
             if file and file.filename:  # Only save if a file was actually selected
-                upload_dir = "static/uploads/contracts"
-                os.makedirs(upload_dir, exist_ok=True)
-                filename = f"{current_user.id}_{secure_filename(file.filename) or 'contract'}"
-                filepath = os.path.join(upload_dir, filename)
-                file.save(filepath)
-                profile.contract_file = f"uploads/contracts/{filename}"
+                ext = os.path.splitext(file.filename)[1].lower()
+                if ext not in CONTRACT_EXTENSIONS:
+                    flash("Contracts must be a PDF, image or Word document.", "danger")
+                    return redirect(url_for("auth.profile"))
+                os.makedirs(contracts_dir(), exist_ok=True)
+                filename = f"{current_user.id}_{secrets.token_hex(6)}{ext}"
+                file.save(os.path.join(contracts_dir(), filename))
+                remove_contract_file(profile.contract_file)   # replace, don't pile up old copies
+                profile.contract_file = filename
 
         # Lock the profile after successful update
         profile.editable = False
@@ -130,3 +141,36 @@ def profile():
 
     # GET request - render the profile page
     return render_template("profile.html", user=current_user, profile=profile)
+
+
+# ----------------------------------------------------------------------
+# Private contract files
+# ----------------------------------------------------------------------
+CONTRACT_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"}
+
+
+def contracts_dir():
+    return os.path.join(current_app.instance_path, "contracts")
+
+
+def remove_contract_file(stored_name):
+    if not stored_name:
+        return
+    path = os.path.join(contracts_dir(), os.path.basename(stored_name))
+    if os.path.isfile(path):
+        os.remove(path)
+
+
+@auth_bp.route("/contract/<int:user_id>")
+@login_required
+def contract(user_id):
+    """Only the contract's owner or an admin may open it."""
+    if current_user.id != user_id and current_user.role != "admin":
+        abort(403)
+    profile = UserProfile.query.filter_by(user_id=user_id).first_or_404()
+    if not profile.contract_file:
+        abort(404)
+    path = os.path.join(contracts_dir(), os.path.basename(profile.contract_file))
+    if not os.path.isfile(path):
+        abort(404)
+    return send_file(path, as_attachment=False)

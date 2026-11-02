@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ biz.name }}{% endblock %} | {{ biz.name }} staff</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/cth_mark.png') }}">
+  {% block head_pre %}{% endblock %}
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/staff.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="app">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8z"/><path d="m3 8 9 5 9-5M12 13v8"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z"/><path d="M9 7h6M9 11h6M9 15h4"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1.2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-till" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><rect x="5" y="6" width="14" height="16" rx="2"/><path d="M9 12h6M9 16h4"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+</defs></svg>
+
+{% set is_admin = current_user.role == 'admin' %}
+{% set ep = request.endpoint or '' %}
+{% set view = request.args.get('view') or request.form.get('view') or '' %}
+{% macro item(href, icon, label, active, badge=0) %}
+  <a href="{{ href }}" class="{{ 'active' if active }}"><svg class="i"><use href="#i-{{ icon }}"/></svg>{{ label }}{% if badge %}<span class="count">{{ badge }}</span>{% endif %}</a>
+{% endmacro %}
+
+<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+  <a class="side-brand" href="{{ url_for('admin.admin_dashboard') if is_admin else url_for('cashier.cashier_dashboard') }}">
+    <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="">
+    <span><strong>{{ biz.name }}</strong><small>{{ 'ADMIN' if is_admin else 'CASHIER' }}</small></span>
+  </a>
+  <nav class="side-nav">
+  {% if is_admin %}
+    <div class="side-group">Overview</div>
+    {{ item(url_for('admin.admin_dashboard', view='overview'), 'grid', 'Dashboard', ep == 'admin.admin_dashboard' and view in ('', 'overview', 'dashboard')) }}
+    <div class="side-group">Selling</div>
+    {{ item(url_for('admin.view_sales'), 'receipt', 'Sales records', ep == 'admin.view_sales') }}
+    {{ item(url_for('admin.quotations'), 'file', 'Quotations', ep in ('admin.quotations', 'admin.edit_quotation')) }}
+    {{ item(url_for('staff_orders.order_list'), 'bag', 'Online orders', ep.startswith('staff_orders.'), staff_pending_orders) }}
+    <div class="side-group">Stock</div>
+    {{ item(url_for('admin.admin_dashboard', view='products'), 'box', 'Products', ep == 'admin.admin_dashboard' and view == 'products') }}
+    {{ item(url_for('admin.admin_dashboard', view='stock'), 'plus', 'Add stock', ep == 'admin.admin_dashboard' and view == 'stock') }}
+    {{ item(url_for('admin.admin_dashboard', view='requests'), 'inbox', 'Requests', ep == 'admin.admin_dashboard' and view in ('requests', 'defects')) }}
+    <div class="side-group">Money &amp; people</div>
+    {{ item(url_for('admin.admin_dashboard', view='expenses'), 'wallet', 'Expenses', ep == 'admin.admin_dashboard' and view == 'expenses') }}
+    {{ item(url_for('admin.users'), 'users', 'Users', ep == 'admin.users') }}
+  {% else %}
+    <div class="side-group">Till</div>
+    {{ item(url_for('cashier.cashier_dashboard'), 'till', 'Point of sale', ep == 'cashier.cashier_dashboard') }}
+    {{ item(url_for('cashier.inventory'), 'clip', 'Inventory', ep == 'cashier.inventory') }}
+    <div class="side-group">Selling</div>
+    {{ item(url_for('cashier.quotations'), 'file', 'Quotations', ep in ('cashier.quotations', 'cashier.edit_quotation')) }}
+    {{ item(url_for('staff_orders.order_list'), 'bag', 'Online orders', ep.startswith('staff_orders.'), staff_pending_orders) }}
+    <div class="side-group">Records</div>
+    {{ item(url_for('cashier.daily_report'), 'chart', 'Daily report', ep == 'cashier.daily_report') }}
+    {{ item(url_for('cashier.my_requests'), 'inbox', 'My requests', ep == 'cashier.my_requests') }}
+  {% endif %}
+  </nav>
+  <div class="side-foot">
+    <a class="me" href="{{ url_for('auth.profile') }}">
+      <span class="avatar">{{ (current_user.full_name or current_user.username)[:1]|upper }}</span>
+      <span><strong>{{ current_user.full_name or current_user.username }}</strong><small>{{ current_user.role }}</small></span>
+    </a>
+    <div class="row">
+      <a href="{{ url_for('shop.home') }}" target="_blank" rel="noopener"><svg class="i" style="width:16px;height:16px"><use href="#i-store"/></svg>Shop</a>
+      <a href="{{ url_for('auth.logout') }}"><svg class="i" style="width:16px;height:16px"><use href="#i-out"/></svg>Sign out</a>
+    </div>
+  </div>
+</aside>
+<div class="scrim" onclick="document.body.classList.remove('nav-open')"></div>
+
+<div class="main-col">
+  <header class="topbar">
+    <button type="button" aria-label="Open menu" onclick="document.body.classList.toggle('nav-open')"><svg class="i"><use href="#i-menu"/></svg></button>
+    <strong>{{ biz.name }}</strong>
+    <span class="avatar" style="width:32px;height:32px;font-size:.85rem">{{ (current_user.full_name or current_user.username)[:1]|upper }}</span>
+  </header>
+  <main class="app-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}<div class="flashes" role="status">{% for cat, msg in messages %}<div class="flash-message {{ cat }}">{{ msg }}<span class="dismiss" onclick="this.parentElement.remove()">&times;</span></div>{% endfor %}</div>{% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

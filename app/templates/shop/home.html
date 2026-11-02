@@ -2,22 +2,48 @@
 {% from 'shop/_card.html' import product_card with context %}
 {% block content %}
 <section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>Quality laptops and gadgets, <em>ready to order.</em></h1>
+      <p>See what's in stock right now, pay online or at the shop, then collect your order or have it delivered.</p>
+      <form class="hero-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
+        <input type="search" name="q" placeholder="Try &quot;Dell Latitude&quot; or &quot;AirPods&quot;" aria-label="Search products">
+        <button class="btn btn-gold" type="submit">Search</button>
+      </form>
+      <div class="chips">
+        {% for name, n, tone in categories %}
+          <a class="chip" data-tone="{{ tone }}" href="{{ url_for('shop.catalog', category=name) }}"><i></i>{{ name }} <small>{{ n }}</small></a>
+        {% endfor %}
+      </div>
+    </div>
+    {% if featured %}
+    <div class="hero-panel" aria-label="Fresh in stock">
+      {% for p in featured[:4] %}
+      <a class="hero-tile" href="{{ url_for('shop.product', product_id=p.id) }}">
+        <div class="frame">{% if p.image %}<img src="{{ p.image }}" alt="" width="640" height="480">{% endif %}</div>
+        <div class="meta"><strong>{{ p.title }}</strong><span>{{ p.price|money }}</span></div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section">
   <div class="wrap">
-    <h1>Quality laptops and gadgets, ready to order.</h1>
-    <p>See what's in stock right now, pay online or at the shop, and collect your order or have it delivered.</p>
-    <form class="hero-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
-      <input type="search" name="q" placeholder="Try &quot;Dell Latitude&quot; or &quot;AirPods&quot;" aria-label="Search products">
-      <button class="btn btn-gold" type="submit">Search</button>
-    </form>
-    <div class="chips">
-      {% for name, n in categories %}
-        <a class="chip" href="{{ url_for('shop.catalog', category=name) }}">{{ name }} <small>{{ n }}</small></a>
+    <div class="section-head"><h2>Shop by category</h2></div>
+    <div class="tiles">
+      {% for name, n, tone in categories %}
+      <a class="tile" data-tone="{{ tone }}" href="{{ url_for('shop.catalog', category=name) }}">
+        <i class="dot"></i>
+        <div><strong>{{ name }}</strong><br><span>{{ n }} in stock</span></div>
+      </a>
       {% endfor %}
     </div>
   </div>
 </section>
 
-<section class="section">
+<section class="section tint">
   <div class="wrap">
     <div class="section-head">
       <h2>Available now</h2>
@@ -31,13 +57,13 @@
   </div>
 </section>
 
-<section class="section" style="padding-top:0">
+<section class="section">
   <div class="wrap">
     <h2>How ordering works</h2>
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
-      <div class="panel"><h3>1. Choose and check out</h3><p class="muted" style="margin:0">Add items to your cart and enter your contact details. No account needed.</p></div>
-      <div class="panel"><h3>2. Pay your way</h3><p class="muted" style="margin:0">Pay online, or reserve your items and pay when you arrive. We hold them while you do.</p></div>
-      <div class="panel"><h3>3. Collect or get it delivered</h3><p class="muted" style="margin:0">We'll mark your order ready. Track it any time with your order number.</p></div>
+    <div class="steps">
+      <div class="step" data-tone="blue"><div class="step-num">1</div><h3>Choose and check out</h3><p class="muted" style="margin:0">Add items to your cart and enter your contact details. No account needed.</p></div>
+      <div class="step" data-tone="violet"><div class="step-num">2</div><h3>Pay your way</h3><p class="muted" style="margin:0">Pay online, or reserve your items and pay when you arrive. We hold them while you do.</p></div>
+      <div class="step" data-tone="teal"><div class="step-num">3</div><h3>Collect or get it delivered</h3><p class="muted" style="margin:0">We'll mark your order ready. Track it any time with your order number.</p></div>
     </div>
   </div>
 </section>

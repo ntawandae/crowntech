@@ -1,193 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>User Management</title>
-    <style>
-        body {
-            font-family: "Segoe UI", Arial, sans-serif;
-            margin: 20px;
-            background: #f9fafb;
-        }
-
-        h2 {
-            text-align: center;
-            color: #111827;
-            margin-bottom: 20px;
-        }
-
-        /* ===== Buttons ===== */
-        .btn {
-            padding: 6px 14px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s ease-in-out;
-            font-size: 13px;
-            margin: 0 4px;
-        }
-
-        .btn-primary { background: #3b82f6; color: #fff; }
-        .btn-primary:hover { background: #2563eb; }
-        .btn-danger { background: #dc2626; color: #fff; }
-        .btn-danger:hover { background: #b91c1c; }
-        .btn-warning { background: #f59e0b; color: #fff; }
-        .btn-warning:hover { background: #d97706; }
-        .btn-success { background: #16a34a; color: #fff; }
-        .btn-success:hover { background: #15803d; }
-        .btn-info { background: #0ea5e9; color: #fff; }
-        .btn-info:hover { background: #0284c7; }
-
-        /* ===== Table ===== */
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
-            margin-top: 25px;
-            overflow: hidden;
-            border: 1px solid #e5e7eb;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 14px;
-            color: #1e293b;
-        }
-
-        thead tr {
-            background: #f1f5f9;
-        }
-
-        th {
-            text-align: left;
-            padding: 12px 14px;
-            font-weight: 600;
-            color: #111827;
-            border-bottom: 2px solid #e2e8f0;
-            position: sticky;
-            top: 0;
-            background: #f8fafc;
-            z-index: 2;
-        }
-
-        td {
-            padding: 12px 14px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-
-        tbody tr:nth-child(odd) { background: #fafafa; }
-        tbody tr:hover { background: #eff6ff; transition: background 0.2s ease-in-out; }
-
-        .disabled { opacity: 0.5; }
-
-        td:last-child {
-            white-space: nowrap;
-            width: 300px;
-            text-align: right;
-        }
-
-        /* ===== Modals ===== */
-        .modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.4);
-            z-index: 50;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: #fff;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-            margin: 20px;
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .modal-content h3 {
-            margin-top: 0;
-            margin-bottom: 20px;
-            color: #111827;
-            text-align: center;
-            font-size: 1.4rem;
-        }
-
-        .profile-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-            margin-top: 16px;
-        }
-
-        .profile-item {
-            background: #f8fafc;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .profile-item strong {
-            display: block;
-            color: #475569;
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-        }
-
-        .contract-link {
-            color: #3b82f6;
-            text-decoration: none;
-        }
-        .contract-link:hover {
-            text-decoration: underline;
-        }
-
-        .modal-buttons {
-            text-align: right;
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid #e2e8f0;
-        }
-
-        /* ===== Flash messages ===== */
-        .flash {
-            padding: 10px 15px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-
-        .flash-success { background: #16a34a; color: #fff; }
-        .flash-danger { background: #dc2626; color: #fff; }
-        .flash-warning { background: #f59e0b; color: #fff; }
-        .flash-info { background: #3b82f6; color: #fff; }
-    </style>
-</head>
-<body>
-    {% include 'admin_nav.html' %}
+{% extends "staff/layout.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+    
 
     <h2>User Management</h2>
 
     <!-- Flash messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash flash-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+    
 
     <!-- Create User Button -->
     <div style="margin-bottom: 20px;">
-        <button class="btn btn-primary" onclick="openCreateModal()">➕ Create User</button>
+        <button class="btn btn-primary" onclick="openCreateModal()">Create User</button>
     </div>
 
     <!-- Users Table -->
@@ -349,7 +172,7 @@
                     next_of_kin: "{{ user.profile.next_of_kin or 'N/A' }}",
                     next_of_kin_contact: "{{ user.profile.next_of_kin_contact or 'N/A' }}",
                     next_of_kin_address: "{{ user.profile.next_of_kin_address or 'N/A' }}",
-                    contract_file: "{{ user.profile.contract_file or '' }}"
+                    contract_file: "{{ url_for('auth.contract', user_id=user.id) if user.profile and user.profile.contract_file else '' }}"
                 }{% if not loop.last %},{% endif %}
             {% endfor %}
         };
@@ -364,7 +187,7 @@
 
             let contractLink = '';
             if (data.contract_file) {
-                contractLink = `<a href="{{ url_for('static', filename='') }}${data.contract_file}" target="_blank" class="contract-link">View Contract</a>`;
+                contractLink = `<a href="${data.contract_file}" target="_blank" class="contract-link">View Contract</a>`;
             } else {
                 contractLink = 'No contract uploaded';
             }
@@ -389,5 +212,4 @@
             modal.style.display = 'flex';
         }
     </script>
-</body>
-</html>
+{% endblock %}

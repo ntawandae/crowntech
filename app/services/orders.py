@@ -14,18 +14,15 @@ from flask import current_app
 from sqlalchemy.exc import IntegrityError
 
 from .. import db
-from ..models import Order, OrderItem, Payment, Product, Receipt, Sale, User
+from ..models import ExtraIncome, Order, OrderItem, Payment, Product, Receipt, Sale, User
 
-ZIM_OFFSET = timedelta(hours=2)  # same convention the existing sales code uses
+from ..utils.timeutil import zim_now  # noqa: E402  (same Zimbabwe-local convention as the till)
 _ORDER_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I
 
 
 class OrderError(Exception):
     """A problem the customer can understand and fix (shown on screen)."""
 
-
-def zim_now():
-    return datetime.now(timezone.utc).replace(tzinfo=None) + ZIM_OFFSET
 
 
 def _new_order_number():
@@ -237,6 +234,12 @@ def mark_paid(order, method, reference=None, note=None):
         # The other request (Paynow callback vs. customer return) finished first.
         db.session.rollback()
         order = Order.query.filter_by(id=order.id).first()
+    else:
+        try:
+            from . import pos
+            pos.recompute_day(zim_now().date())
+        except Exception:
+            db.session.rollback()
     return order
 
 
@@ -245,9 +248,12 @@ def _write_receipt(order):
     ts = zim_now()
     receipt = Receipt(
         receipt_number=f"WEB-{order.order_number}"[:20],
-        subtotal=order.subtotal + order.delivery_fee,
+        subtotal=order.subtotal,
         tax=0.0,
         total=order.total,
+        discount=0.0,
+        delivery_fee=order.delivery_fee or 0.0,
+        delivery_address=order.delivery_address if order.delivery_method == "delivery" else None,
         customer_name=order.customer_name,
         customer_email=order.customer_email,
         customer_phone=order.customer_phone,
@@ -267,6 +273,9 @@ def _write_receipt(order):
             timestamp=ts,
             receipt_id=receipt.id,
         ))
+    if order.delivery_fee:
+        db.session.add(ExtraIncome(description=f"Delivery fee - {receipt.receipt_number}",
+                                   amount=float(order.delivery_fee), recorded_by=system_user.id, timestamp=ts))
     order.receipt_id = receipt.id
 
 

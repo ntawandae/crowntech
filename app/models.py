@@ -1,6 +1,7 @@
 from flask_login import UserMixin
 from datetime import datetime
 from . import db, login_manager
+from .utils.timeutil import zim_now  # sale/expense/request times are stored in Zimbabwe local time
 
 class User(UserMixin, db.Model):
     __tablename__ = "user"  # make sure table name matches the FK
@@ -34,7 +35,7 @@ class Sale(db.Model):
     quantity = db.Column(db.Integer)
     total_price = db.Column(db.Float)  # renamed from `total` to `total_price` to match usage
     profit = db.Column(db.Float)       # added profit field to use in queries
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=zim_now)
     cashier_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     receipt_id = db.Column(db.Integer, db.ForeignKey('receipt.id'), nullable=True)  # Link to Receipt
     product = db.relationship('Product', backref='sales')
@@ -49,15 +50,18 @@ class Receipt(db.Model):
     customer_name = db.Column(db.String(100), nullable=True)
     customer_email = db.Column(db.String(120), nullable=True)
     customer_phone = db.Column(db.String(20), nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=zim_now)
     cashier_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    discount = db.Column(db.Float, default=0.0)          # money taken off the subtotal
+    delivery_fee = db.Column(db.Float, default=0.0)      # delivery charged on this sale (total includes it)
+    delivery_address = db.Column(db.String(300), nullable=True)
     sales = db.relationship('Sale', backref='receipt', lazy=True)
 
 class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     description = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Float, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=zim_now)
     recorded_by = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 class StockRequest(db.Model):
@@ -69,7 +73,7 @@ class StockRequest(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending/approved/rejected
     requested_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     approved_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=zim_now)
 
     product = db.relationship('Product', backref='stock_requests')
 
@@ -79,7 +83,7 @@ class DefectRequests(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     reason = db.Column(db.String(255))
     status = db.Column(db.String(50), default='Pending')  # Pending / Approved / Rejected
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=zim_now)
     approved_at = db.Column(db.DateTime, nullable=True)
     rejected_at = db.Column(db.DateTime, nullable=True)
     returned_at = db.Column(db.DateTime, nullable=True)
@@ -94,7 +98,7 @@ class Quotation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     quotation_number = db.Column(db.String(20), unique=True, nullable=False)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=zim_now)
     items = db.relationship('QuotationItem', backref='quotation', cascade='all, delete-orphan')
     discount = db.Column(db.Float, default=0)   # <---- Add this line
     customer_name = db.Column(db.String(100))  # Optional customer info
@@ -120,7 +124,7 @@ class ExtraIncome(db.Model):
     description = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     recorded_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=zim_now)
 
 class DailyCashBalance(db.Model):
     __tablename__ = 'daily_cash_balance'
@@ -142,7 +146,7 @@ class SaleReversal(db.Model):
     amount_reversed = db.Column(db.Float, nullable=False)
     reason = db.Column(db.String(255))
     reversed_by = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=zim_now)
 
     sale = db.relationship('Sale', backref='reversal', lazy=True)
     product = db.relationship('Product', lazy=True)

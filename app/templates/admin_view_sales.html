@@ -1,193 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Sales Records</title>
-    <style>
-        body {
-            font-family: "Segoe UI", Arial, sans-serif;
-            margin: 20px;
-            background: #f9fafb;
-        }
-
-        h2 {
-            text-align: center;
-            color: #111827;
-            margin-bottom: 20px;
-        }
-
-        /* ===== Filter Section ===== */
-        .filters {
-            background: #fff;
-            padding: 15px 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .filters input[type="date"],
-        .filters input[type="text"] {
-            padding: 6px 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.2s;
-        }
-
-        .filters input:focus {
-            border-color: #3b82f6;
-            outline: none;
-        }
-
-        .filters button {
-            background: #3b82f6;
-            border: none;
-            color: white;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .filters button:hover { background: #2563eb; }
-
-        .filters .reset-btn {
-            background: #6b7280;
-        }
-
-        .filters .reset-btn:hover { background: #4b5563; }
-
-        /* ===== Card Container ===== */
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
-            margin-top: 25px;
-            overflow: hidden;
-            border: 1px solid #e5e7eb;
-        }
-
-        /* ===== Table Styling ===== */
-        table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 14px;
-            color: #1e293b;
-        }
-
-        thead tr {
-            background: #f1f5f9;
-        }
-
-        th {
-            text-align: left;
-            padding: 12px 14px;
-            font-weight: 600;
-            color: #111827;
-            border-bottom: 2px solid #e2e8f0;
-            position: sticky;
-            top: 0;
-            background: #f8fafc;
-            z-index: 2;
-        }
-
-        td {
-            padding: 12px 14px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-
-        tbody tr:nth-child(odd) {
-            background: #fafafa;
-        }
-
-        tbody tr:hover {
-            background: #eff6ff;
-            transition: background 0.2s ease-in-out;
-        }
-
-        /* ===== Buttons & Inputs ===== */
-        .btn-danger {
-            background: #dc2626;
-            border: none;
-            color: white;
-            padding: 5px 10px;
-            font-size: 13px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-        }
-
-        .btn-danger:hover { background: #b91c1c; }
-
-        .form-control-sm {
-            font-size: 13px;
-            padding: 4px 6px;
-            border: 1px solid #cbd5e1;
-            border-radius: 5px;
-            background-color: #f9fafb;
-            transition: border-color 0.2s ease;
-        }
-
-        .form-control-sm:focus {
-            border-color: #3b82f6;
-            outline: none;
-        }
-
-        td:last-child {
-            white-space: nowrap;
-            width: 220px;
-        }
-
-        .no-results {
-            text-align: center;
-            padding: 18px;
-            color: #6b7280;
-            font-style: italic;
-            background: #f9fafb;
-        }
-
-        /* ===== Pagination ===== */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 6px;
-            list-style: none;
-            padding: 0;
-            margin: 20px 0;
-        }
-
-        .pagination a, .pagination span {
-            padding: 6px 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 5px;
-            text-decoration: none;
-            color: #111827;
-        }
-
-        .pagination .active {
-            background: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-        }
-    </style>
-</head>
-<body>
-    {% include 'admin_nav.html' %}
-    <h2>📅 Sales Records for {{ date_filter }}</h2>
+{% extends "staff/layout.html" %}
+{% block title %}Sales records{% endblock %}
+{% block content %}
+    
+    <div class="page-head"><div><h1>Sales records</h1><p>{{ 'Search results' if search_query else date_filter }}</p></div></div>
 
     <!-- Filter Section -->
     <form method="GET" class="filters" action="{{ url_for('admin.view_sales') }}">
         <input type="date" name="date" value="{{ date_filter or today.strftime('%Y-%m-%d') }}">
         <input type="text" name="search" placeholder="Search by receipt # or product name" value="{{ search_query or '' }}">
-        <button type="submit">🔍 Filter</button>
+        <button type="submit">Filter</button>
         <a href="{{ url_for('admin.view_sales') }}" style="text-decoration:none;">
             <button type="button" class="reset-btn">Reset</button>
         </a>
@@ -212,7 +33,7 @@
                 {% if sales %}
                     {% for sale in sales %}
                     <tr>
-                        <td>{{ sale.receipt.receipt_number if sale.receipt else 'N/A' }}</td>
+                        <td>{% if sale.receipt %}<a href="{{ url_for('admin.reprint_receipt', receipt_id=sale.receipt.id) }}" title="Download receipt PDF">{{ sale.receipt.receipt_number }}</a>{% else %}N/A{% endif %}</td>
                         <td>{{ sale.product.name }}</td>
                         <td>{{ sale.quantity }}</td>
                         <td>{{ "%.2f"|format(sale.total_price) }}</td>
@@ -224,7 +45,7 @@
                                 <input type="text" name="reason" placeholder="Reason (optional)" class="form-control-sm" style="width:130px;">
                                 <button type="submit" class="btn-danger"
                                     onclick="return confirm('Are you sure you want to reverse this sale?');">
-                                    🔄 Reverse
+                                    Reverse
                                 </button>
                             </form>
                         </td>
@@ -258,5 +79,4 @@
         {% endif %}
     </ul>
     {% endif %}
-</body>
-</html>
+{% endblock %}

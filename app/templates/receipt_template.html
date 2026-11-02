@@ -157,7 +157,7 @@
         <tr>
             <td style="width:72%; vertical-align:top; padding:0; margin:0;">
                 <div><strong>Receipt #:</strong> {{ receipt_number }}</div>
-                <div><strong>Date:</strong> {{ timestamp.strftime('%d %B %Y, %I:%M %p') if timestamp else current_year }}</div>
+                <div><strong>Date:</strong> {{ timestamp.strftime('%d %B %Y, %I:%M %p') if timestamp else '' }}</div>
                 <div><strong>Prepared by:</strong> {{ printed_by }}</div>
             </td>
             <td style="width:28%; vertical-align:top; text-align:left; padding:0; margin:0;">
@@ -167,6 +167,9 @@
                 {% endif %}
                 {% if customer_phone %}
                 <div><strong>Phone:</strong> {{ customer_phone }}</div>
+                {% endif %}
+                {% if delivery_address %}
+                <div><strong>Deliver to:</strong> {{ delivery_address }}</div>
                 {% endif %}
             </td>
         </tr>
@@ -190,7 +193,7 @@
                 <td>{{ item.name if item.name else item.product_name }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>${{ "%.2f"|format(item.price if item.price else item.unit_price) }}</td>
-                <td>${{ "%.2f"|format(item.original_total_price) }}</td>
+                <td>${{ "%.2f"|format(item.original_total_price if item.original_total_price is defined else item.total_price) }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -201,6 +204,7 @@
         <p><strong>Subtotal:</strong> ${{ "%.2f"|format(subtotal) }}</p>
         <p><strong>Tax:</strong> ${{ "%.2f"|format(tax) }}</p>
         <p><strong>Discount:</strong> {% if discount > 0 %}-${{ "%.2f"|format(discount) }}{% else %}$0.00{% endif %}</p>
+        {% if delivery_fee and delivery_fee > 0 %}<p><strong>Delivery:</strong> ${{ "%.2f"|format(delivery_fee) }}</p>{% endif %}
         <p class="total"><strong>Grand Total:</strong> ${{ "%.2f"|format(total) }}</p>
     </div>
 

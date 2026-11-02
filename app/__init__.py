@@ -88,6 +88,12 @@ def create_app(config_object=None):
             "current_year": datetime.utcnow().year,
         }
 
+    @app.before_request
+    def block_public_contracts():
+        from flask import abort, request
+        if request.path.startswith("/static/uploads/contracts"):
+            abort(404)
+
     @app.after_request
     def security_headers(resp):
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -108,6 +114,10 @@ def create_app(config_object=None):
         return render_template("shop/error.html", code=code, message=messages.get(code, "Something went wrong.")), code
 
     with app.app_context():
-        db.create_all()  # adds the new order tables; existing tables and data are untouched
+        db.create_all()  # adds new tables; existing tables and data are untouched
+        from .migrate import upgrade_schema
+        upgrade_schema(db)  # adds new columns (e.g. receipt.discount / delivery_fee) if missing
+        from .migrate import move_legacy_contracts
+        move_legacy_contracts(app, db)  # contracts are private now
 
     return app

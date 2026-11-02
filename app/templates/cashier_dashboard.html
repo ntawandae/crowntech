@@ -1,681 +1,200 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Cashier Dashboard</title>
-    <style>
-html, body {
-    font-family: Arial, sans-serif;
-    background: #f7f7f7;
-    margin: 0;
-    padding: 4px;
-    font-size: 16px;
-    max-width: 100%;
-    overflow-x: hidden;
-    box-sizing: border-box;
-}
-*, *:before, *:after { box-sizing: inherit; }
-
-h2, h3 {
-    margin: 0 0 8px 0;
-    color: #007bff;
-    font-size: 1.4rem;
-}
-
-/* Layout */
-.container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin: 0 10px;
-    justify-content: center;
-    max-width: 100%;
-}
-.products, .cart {
-    flex: 1;
-    min-width: 280px;
-    background: white;
-    padding: 8px;
-    margin: 0;
-    box-shadow: 0 0 8px rgba(0,0,0,0.1);
-    border-radius: 8px;
-    max-height: 50vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-}
-.dashboard {
-    max-width: 600px;
-    margin: auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-}
-
-/* Tables */
-.table-responsive {
-    max-width: 100%;
-    overflow-x: hidden;
-}
-table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-th, td {
-    border: 1px solid #ddd;
-    padding: 6px;
-    text-align: left;
-    overflow: hidden;
-    font-size: 0.95rem;
-}
-.product-name {
-    max-width: 120px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-}
-.product-name:hover {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    z-index: 1;
-    background: #fff;
-    position: relative;
-}
-.products th:last-child, .products td:last-child,
-.cart th:last-child, .cart td:last-child {
-    width: 80px;
-}
-.products th:first-child, .products td:first-child {
-    width: 120px;
-}
-.products th:nth-child(2), .products td:nth-child(2),
-.products th:nth-child(3), .products td:nth-child(3) {
-    width: 60px;
-}
-.cart th:first-child, .cart td:first-child {
-    width: 120px;
-}
-.cart th:nth-child(2), .cart td:nth-child(2) {
-    width: 90px;
-}
-.cart th:nth-child(3), .cart td:nth-child(3),
-.cart th:nth-child(4), .cart td:nth-child(4) {
-    width: 60px;
-}
-
-/* Quantity Button Controls */
-.quantity-control {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    justify-content: flex-start;
-}
-.quantity-control form {
-    display: inline-flex;
-}
-.quantity-control button {
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    font-size: 0.95rem;
-    font-weight: bold;
-    line-height: 1;
-    border-radius: 4px;
-    background-color: #f1f1f1;
-    color: #333;
-    border: 1px solid #ccc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s, color 0.2s;
-}
-.quantity-control button:hover {
-    background-color: #007bff;
-    color: white;
-    border-color: #0056b3;
-}
-.quantity-control button:disabled {
-    background-color: #e0e0e0;
-    color: #999;
-    border-color: #ccc;
-    cursor: not-allowed;
-}
-.quantity-control span {
-    font-size: 0.95rem;
-    min-width: 18px;
-    text-align: center;
-}
-
-/* Inputs */
-input[type="number"], input[type="text"], input[type="email"], select {
-    width: 100%;
-    padding: 8px 6px;
-    margin: 0 0 6px 0;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 16px; /* Ensure font-size is 16px to prevent zoom */
-    touch-action: manipulation;
-}
-
-/* Buttons */
-button, .btn-group button {
-    display: inline-block;
-    width: auto;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 6px;
-    background-color: #007bff;
-    color: white;
-    cursor: pointer;
-    font-size: 0.95rem;
-    min-height: 34px;
-    transition: background-color 0.3s ease;
-    touch-action: manipulation;
-}
-button:hover { background: #0056b3; }
-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
-button[style*="background-color: #dc3545"] {
-    background-color: #dc3545;
-}
-button[style*="background-color: #dc3545"]:hover {
-    background-color: #c82333;
-}
-
-/* Flash messages */
-.flash-messages { margin: 0 0 6px 0; }
-.flash-message {
-    padding: 8px 6px;
-    margin: 0 0 6px 0;
-    border-radius: 6px;
-    position: relative;
-    font-size: 0.85rem;
-}
-.flash-message.success { background: #e6ffe6; border: 1px solid #28a745; color: #28a745; }
-.flash-message.danger { background: #ffe6e6; border: 1px solid #dc3545; color: #dc3545; }
-.flash-message.info { background: #e6f3ff; border: 1px solid #007bff; color: #007bff; }
-.flash-message.warning { background: #fff3e6; border: 1px solid #ffc107; color: #ffc107; }
-.flash-message .dismiss {
-    position: absolute;
-    right: 6px;
-    top: 6px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 0.9rem;
-}
-
-/* Modal */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-}
-.modal-content {
-    background: white;
-    padding: 12px;
-    border-radius: 8px;
-    max-width: 360px;
-    width: 90%;
-    box-shadow: 0 0 8px rgba(0,0,0,0.2);
-}
-.modal-content h3 {
-    margin: 0 0 10px;
-    font-size: 1.2rem;
-}
-.modal-content label {
-    display: block;
-    margin: 5px 0 2px;
-    font-weight: bold;
-    font-size: 13px;
-}
-.modal-content input {
-    width: 100%;
-    padding: 6px;
-    margin-bottom: 8px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 16px; /* Ensure font-size is 16px to prevent zoom */
-}
-.modal-content button {
-    width: auto;
-    padding: 8px 14px;
-}
-.modal-content .close {
-    background: #dc3545;
-    margin-left: 8px;
-}
-.modal-content .close:hover {
-    background: #c82333;
-}
-
-/* Stock, Defect, Expense */
-.stock-defect-expense {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 10px;
-    width: 100%;
-}
-.stock-defect-expense > div {
-    background: white;
-    border-radius: 8px;
-    padding: 12px;
-    flex: 1;
-    min-width: 260px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-form {
-    display: flex;
-    flex-direction: column;
-}
-label {
-    margin: 5px 0 2px;
-    font-weight: bold;
-    font-size: 13px;
-}
-
-/* Mobile adjustments */
-@media (max-width: 768px) {
-    html, body { padding: 6px 6px; }
-    .container { gap: 8px; margin: 0 6px; }
-    .products, .cart { min-width: 100%; padding: 6px; max-height: 40vh; }
-    .btn-group button, button:not(.quantity-control button) {
-        margin: 0 4px 5px 0;
-        font-size: 0.9rem;
-        min-height: 32px;
-    }
-    input[type="number"], input[type="text"], input[type="email"], select {
-        padding: 6px 5px;
-        margin: 0 0 5px 0;
-        font-size: 16px; /* Maintain 16px to prevent zoom */
-    }
-    th, td { font-size: 0.8rem; padding: 4px; }
-    .product-name { max-width: 80px; }
-    .product-name:hover {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .products th:first-child, .products td:first-child { width: 80px; }
-    .products th:nth-child(2), .products td:nth-child(2),
-    .products th:nth-child(3), .products td:nth-child(3) { width: 50px; }
-    .products th:last-child, .products td:last-child { width: 70px; }
-    .cart th:first-child, .cart td:first-child { width: 80px; }
-    .cart th:nth-child(2), .cart td:nth-child(2) { width: 80px; }
-    .cart th:nth-child(3), .cart td:nth-child(3),
-    .cart th:nth-child(4), .cart td:nth-child(4) { width: 50px; }
-    .quantity-control { gap: 4px; }
-    .quantity-control button {
-        width: 24px;
-        height: 24px;
-        font-size: 0.9rem;
-        min-height: 24px;
-    }
-    .quantity-control span { font-size: 0.9rem; min-width: 16px; }
-    .flash-messages { margin: 0 0 5px 0; }
-    .flash-message { padding: 6px 5px; margin: 0 0 5px 0; }
-    .stock-defect-expense { flex-direction: column; gap: 8px; }
-    .stock-defect-expense > div { width: 100%; padding: 10px; min-width: 0; }
-}
-
-/* Extra small screens */
-@media (max-width: 480px) {
-    html, body { font-size: 14px; padding: 4px 4px; }
-    h2, h3 { font-size: 1.2rem; margin: 0 0 5px 0; }
-    .products, .cart { padding: 4px; max-height: 35vh; }
-    .btn-group button, button:not(.quantity-control button) {
-        margin: 0 3px 4px 0;
-        font-size: 0.85rem;
-        min-height: 30px;
-    }
-    input[type="number"], input[type="text"], input[type="email"], select {
-        padding: 5px 4px;
-        margin: 0 0 4px 0;
-        font-size: 16px; /* Maintain 16px to prevent zoom */
-    }
-    th, td { font-size: 0.75rem; padding: 3px; }
-    .product-name { max-width: 60px; }
-    .products th:first-child, .products td:first-child { width: 70px; }
-    .products th:nth-child(2), .products td:nth-child(2),
-    .products th:nth-child(3), .products td:nth-child(3) { width: 30px; }
-    .products th:last-child, .products td:last-child { width: 60px; }
-    .cart th:first-child, .cart td:first-child { width: 70px; }
-    .cart th:nth-child(2), .cart td:nth-child(2) { width: 60px; }
-    .cart th:nth-child(3), .cart td:nth-child(3),
-    .cart th:nth-child(4), .cart td:nth-child(4) { width: 40px; }
-    .quantity-control { gap: 3px; }
-    .quantity-control button {
-        width: 22px;
-        height: 22px;
-        font-size: 0.85rem;
-        min-height: 22px;
-    }
-    .quantity-control span { font-size: 0.85rem; min-width: 14px; }
-    .flash-messages { margin: 0 0 4px 0; }
-    .flash-message { padding: 5px 4px; margin: 0 0 4px 0; }
-}
-    </style>
-    <script>
+{% extends "staff/layout.html" %}
+{% block title %}Point of sale{% endblock %}
+{% block head %}
+<script>
 function filterTable() {
-    let input = document.getElementById("searchInput").value.toLowerCase();
-    let rows = document.querySelectorAll("#productTable tbody tr");
-    rows.forEach(row => {
-        let name = row.cells[0].innerText.toLowerCase();
-        row.style.display = name.includes(input) ? "" : "none";
-    });
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('#productTable tbody tr').forEach(r => {
+    r.style.display = r.cells[0].innerText.toLowerCase().includes(q) ? '' : 'none';
+  });
 }
+</script>
+{% endblock %}
+{% block content %}
+{% set subtotal = namespace(v=0) %}
+{% for item in cart %}{% set subtotal.v = subtotal.v + item.price * item.quantity %}{% endfor %}
 
-// Toggle full product name on click for mobile
-document.querySelectorAll('.product-name').forEach(cell => {
-    cell.addEventListener('click', function() {
-        if (window.innerWidth <= 768) {
-            this.style.whiteSpace = this.style.whiteSpace === 'normal' ? 'nowrap' : 'normal';
-            this.style.overflow = this.style.overflow === 'visible' ? 'hidden' : 'visible';
-            this.style.textOverflow = this.style.textOverflow === 'clip' ? 'ellipsis' : 'clip';
-        }
-    });
-});
-
-function showCustomerModal() {
-    document.getElementById('customerModal').style.display = 'flex';
-    return false; // Prevent default form submission
-}
-
-function closeModal() {
-    document.getElementById('customerModal').style.display = 'none';
-}
-
-function submitCustomerDetails() {
-    const discountValue = document.getElementById('discount_sell_receipt').value;
-    document.getElementById('customer_discount').value = discountValue;
-    console.log("Submitting customer form with discount:", discountValue);
-
-    document.querySelector('.cart table')?.remove();
-    document.querySelector('.cart .btn-group')?.remove();
-    document.querySelector('.cart').innerHTML += '<p>No items in cart yet.</p>';
-
-    document.getElementById('customerForm').submit();
-}
-
-// Calculate subtotal from cart
-function calculateSubtotal() {
-    const cart = {{ cart | tojson | safe }};
-    if (!cart || !Array.isArray(cart)) {
-        console.log("Cart is empty or invalid");
-        return 0;
-    }
-    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-}
-
-// Sync discount to hidden inputs
-function syncDiscount(sourceId, targetId) {
-    const discountInput = document.getElementById(sourceId);
-    const targetInput = document.getElementById(targetId);
-    const finalTotal = document.getElementById('final_total');
-
-    if (!discountInput || !targetInput || !finalTotal) {
-        console.error(`Missing DOM elements: discountInput=${!!discountInput}, targetInput=${!!targetInput}, finalTotal=${!!finalTotal}`);
-        return;
-    }
-
-    let discountValue = parseFloat(discountInput.value) || 0;
-    targetInput.value = discountValue.toFixed(2);
-    console.log(`Syncing discount: ${sourceId} (${discountValue}) to ${targetId}`);
-
-    const subtotal = calculateSubtotal();
-    let totalAfterDiscount = subtotal - discountValue;
-    if (totalAfterDiscount < 0) totalAfterDiscount = 0;
-    finalTotal.textContent = totalAfterDiscount.toFixed(2);
-}
-
-// Prevent zoom on input focus
-document.addEventListener('DOMContentLoaded', function() {
-    // Prevent iOS zoom on input focus
-    document.querySelectorAll('input, select, textarea').forEach(element => {
-        element.addEventListener('focus', function() {
-            document.querySelector('meta[name=viewport]').setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
-        });
-        element.addEventListener('blur', function() {
-            document.querySelector('meta[name=viewport]').setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
-        });
-    });
-});
-    </script>
-</head>
-<body>
-{% include "cashier_base.html" %}
-
-<!-- Flash Messages -->
-<div class="flash-messages">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash-message {{ category }}">
-                    {{ message }}
-                    <span class="dismiss" onclick="this.parentElement.style.display='none'">✖</span>
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+<div class="page-head">
+  <div><h1>Point of sale</h1><p>Add items, set any discount or delivery fee, then complete the sale.</p></div>
 </div>
 
-<div class="container">
-    <!-- Product List -->
-    <div class="products">
-        <h2>📦 Stock</h2>
-        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search product by name...">
-        <div class="table-responsive">
-            <table id="productTable">
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th>Stock</th>
-                        <th>Price</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for p in products %}
-                    <tr>
-                        <td class="product-name" title="{{ p.name }}">{{ p.name }}</td>
-                        <td>{{ p.quantity }}</td>
-                        <td>${{ '%.2f' % p.price }}</td>
-                        <td>
-                            <form method="POST" action="{{ url_for('cashier.add_one_to_cart', product_id=p.id) }}">
-                                <button type="submit" {% if p.quantity < 1 %}disabled{% endif %}>Add 1</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<div class="pos">
+  <!-- ============ products ============ -->
+  <section class="card pos-products">
+    <div class="card-header">Stock</div>
+    <div class="card-body">
+      <input type="search" id="searchInput" onkeyup="filterTable()" placeholder="Search products by name..." aria-label="Search products">
+      <div class="table-scroll table-responsive" style="margin:0">
+        <table id="productTable">
+          <thead><tr><th>Product</th><th>In stock</th><th class="r">Price</th><th></th></tr></thead>
+          <tbody>
+          {% for p in products %}
+            <tr>
+              <td class="product-name" title="{{ p.name }}">{{ p.name[:80] }}</td>
+              <td><span class="stock-pill {{ 'out' if p.quantity < 1 else ('low' if p.quantity <= 2) }}">{{ p.quantity }}</span></td>
+              <td class="r num">${{ '%.2f' % p.price }}</td>
+              <td class="r">
+                <form method="POST" action="{{ url_for('cashier.add_one_to_cart', product_id=p.id) }}">
+                  <button type="submit" class="btn-sm" {% if p.quantity < 1 %}disabled{% endif %}>Add</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+  </section>
 
-    <!-- Cart -->
-    <div class="cart">
-        <h2>🛒 Cart</h2>
-        {% if cart %}
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Item</th>
-                        <th>Qty</th>
-                        <th>Price</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set subtotal = namespace(value=0) %}
-                    {% for item in cart %}
-                        {% set item_total = item.price * item.quantity %}
-                        {% set subtotal.value = subtotal.value + item_total %}
-                        <tr>
-                            <td class="product-name" title="{{ item.name }}">{{ item.name }}</td>
-                            <td>
-                                <div class="quantity-control">
-                                    <form method="POST" action="{{ url_for('cashier.decrement_cart', product_id=item.id) }}">
-                                        <button type="submit" {% if item.quantity <= 0 %}disabled{% endif %}>-</button>
-                                    </form>
-                                    <span>{{ item.quantity }}</span>
-                                    <form method="POST" action="{{ url_for('cashier.increment_cart', product_id=item.id) }}">
-                                        <button type="submit">+</button>
-                                    </form>
-                                </div>
-                            </td>
-                            <td>${{ "%.2f"|format(item.price) }}</td>
-                            <td>${{ "%.2f"|format(item_total) }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="3"><strong>Subtotal</strong></td>
-                        <td><strong>${{ "%.2f"|format(subtotal.value) }}</strong></td>
-                    </tr>
-                    <tr>
-                        <td colspan="3"><label for="discount"><strong>Discount</strong></label></td>
-                        <td>
-                            <input type="number" name="discount" id="discount" step="0.01" min="0" value="0" style="width:100px;">
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="3"><strong>Total</strong></td>
-                        <td>
-                            <strong>
-                                $<span id="final_total">{{ "%.2f"|format(subtotal.value) }}</span>
-                            </strong>
-                        </td>
-                    </tr>
-                </tfoot>
-            </table>
+  <!-- ============ cart + payment ============ -->
+  <section class="card pos-cart">
+    <div class="card-header">Current sale</div>
+    <div class="card-body">
+    {% if cart %}
+      <div class="lines">
+        {% for item in cart %}
+        <div class="cart-line">
+          <div><div class="nm" title="{{ item.name }}">{{ item.name }}</div><div class="unit num">${{ "%.2f"|format(item.price) }} each</div></div>
+          <div class="qty">
+            <form method="POST" action="{{ url_for('cashier.decrement_cart', product_id=item.id) }}"><button type="submit" aria-label="Fewer">&minus;</button></form>
+            <b>{{ item.quantity }}</b>
+            <form method="POST" action="{{ url_for('cashier.increment_cart', product_id=item.id) }}"><button type="submit" aria-label="More">+</button></form>
+          </div>
+          <div class="num"><b>${{ "%.2f"|format(item.price * item.quantity) }}</b></div>
+        </div>
+        {% endfor %}
+      </div>
 
-            <div class="btn-group" style="margin-top:10px;">
-                <form method="POST" action="{{ url_for('cashier.sell_items') }}" style="display:inline;">
-                    <input type="hidden" name="discount" id="discount_sell" value="0">
-                    <button type="submit" onclick="syncDiscount('discount', 'discount_sell');">💵 Sell</button>
-                </form>
-                <form method="POST" action="{{ url_for('cashier.sell_and_receipt') }}" style="display:inline;">
-                    <input type="hidden" name="discount_sell_receipt" id="discount_sell_receipt" value="0">
-                    <button type="submit" onclick="syncDiscount('discount', 'discount_sell_receipt'); return showCustomerModal();">🖨️ Sell & Print</button>
-                </form>
-                <form method="POST" action="{{ url_for('cashier.clear_cart') }}" style="display:inline;">
-                    <button type="submit" style="background-color: #dc3545;">❌ Clear Cart</button>
-                </form>
+      <form method="POST" id="saleForm" class="pay-box" autocomplete="off">
+        <div>
+          <label>Discount</label>
+          <div class="pay-row" style="grid-template-columns: auto 1fr; align-items: center">
+            <div class="seg" role="radiogroup" aria-label="Discount type">
+              <label><input type="radio" name="discount_mode" value="amount" checked>$</label>
+              <label><input type="radio" name="discount_mode" value="percent">%</label>
             </div>
+            <input type="number" name="discount_value" id="discountValue" min="0" step="0.01" value="0" inputmode="decimal" style="margin:0" aria-label="Discount value">
+          </div>
+          {% if discount_limit %}<div class="hint">Cashiers can give up to {{ discount_limit|round(1) }}% off.</div>{% endif %}
         </div>
-        <script>
-            // Attach discount input listener
-            document.getElementById('discount').addEventListener('input', function() {
-                console.log("Discount input changed:", this.value);
-                syncDiscount('discount', 'discount_sell');
-                syncDiscount('discount', 'discount_sell_receipt');
-            });
 
-            // Initialize total on page load
-            syncDiscount('discount', 'discount_sell');
-            syncDiscount('discount', 'discount_sell_receipt');
-        </script>
-        {% else %}
-            <p>No items in cart yet.</p>
-        {% endif %}
+        <div>
+          <label for="deliveryFee">Delivery fee <span class="hint">(optional)</span></label>
+          <input type="number" name="delivery_fee" id="deliveryFee" min="0" step="0.01" value="0" inputmode="decimal" style="margin:0">
+          <div id="addressBox" hidden style="margin-top:8px">
+            <input type="text" name="delivery_address" placeholder="Delivery address" maxlength="300" style="margin:0" aria-label="Delivery address">
+          </div>
+        </div>
+
+        <div class="totals-box" aria-live="polite">
+          <div><span>Subtotal</span><span class="num" id="tSub">${{ "%.2f"|format(subtotal.v) }}</span></div>
+          <div class="minus" id="rowDisc" hidden><span>Discount</span><span class="num" id="tDisc"></span></div>
+          <div class="plus" id="rowFee" hidden><span>Delivery</span><span class="num" id="tFee"></span></div>
+          <div class="grand"><span>Total</span><span class="num" id="tTotal">${{ "%.2f"|format(subtotal.v) }}</span></div>
+          <div id="tMsg" class="hint" style="color:var(--bad)" hidden></div>
+        </div>
+
+        <details class="more">
+          <summary>Customer details (for the receipt)</summary>
+          <input type="text" name="customer_name" placeholder="Name" style="margin-top:8px">
+          <input type="email" name="customer_email" placeholder="Email">
+          <input type="text" name="customer_phone" placeholder="Phone">
+        </details>
+
+        <div class="pos-actions">
+          <button type="submit" class="big" formaction="{{ url_for('cashier.sell_items') }}">Complete sale</button>
+          <button type="submit" class="big btn-gold" formaction="{{ url_for('cashier.sell_and_receipt') }}">Sale &amp; receipt</button>
+        </div>
+      </form>
+      <form method="POST" action="{{ url_for('cashier.clear_cart') }}" style="margin-top:10px">
+        <button type="submit" class="btn-danger btn-sm">Clear cart</button>
+      </form>
+    {% else %}
+      <div class="empty-state"><p><b>The cart is empty</b></p><p>Pick products from the list to start a sale.</p></div>
+    {% endif %}
     </div>
-
-    <!-- Customer Details Modal -->
-    <div id="customerModal" class="modal">
-        <div class="modal-content">
-            <h3>Customer Details</h3>
-            <form id="customerForm" method="POST" action="{{ url_for('cashier.sell_and_receipt') }}">
-                <input type="hidden" name="discount" id="customer_discount" value="0">
-                <label for="customer_name">Customer Name (optional):</label>
-                <input type="text" id="customer_name" name="customer_name" placeholder="Enter customer name">
-                <label for="customer_email">Customer Email (optional):</label>
-                <input type="email" id="customer_email" name="customer_email" placeholder="Enter customer email">
-                <label for="customer_phone">Customer Phone (optional):</label>
-                <input type="text" id="customer_phone" name="customer_phone" placeholder="Enter customer phone">
-                <button type="button" onclick="submitCustomerDetails()">Submit</button>
-                <button type="button" class="close" onclick="closeModal()">Cancel</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Stock, Defect & Expense Requests -->
-    <div class="stock-defect-expense">
-        <div class="card">
-            <h3>📥 Stock Request</h3>
-            <form method="POST" action="{{ url_for('cashier.stock_request') }}">
-                <label>Product:</label>
-                <select name="product_id" required>
-                    {% for p in products %}
-                    <option value="{{ p.id }}">{{ p.name }} (Qty: {{ p.quantity }})</option>
-                    {% endfor %}
-                </select>
-                <label>Quantity:</label>
-                <input type="number" name="quantity" min="1" required>
-                <label>Action:</label>
-                <select name="action" required>
-                    <option value="add">Add Stock</option>
-                    <option value="deduct">Deduct Stock</option>
-                </select>
-                <label>Reason (optional):</label>
-                <input type="text" name="reason" placeholder="Reason">
-                <button type="submit">Submit Stock Request</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h3>⚠️ Defect Removal Request</h3>
-            <form method="POST" action="{{ url_for('cashier.submit_defect') }}">
-                <label>Product:</label>
-                <select name="product_id" required>
-                    {% for p in products %}
-                    <option value="{{ p.id }}">{{ p.name }} (Qty: {{ p.quantity }})</option>
-                    {% endfor %}
-                </select>
-                <label>Quantity:</label>
-                <input type="number" name="quantity" min="1" required>
-                <label>Reason:</label>
-                <input type="text" name="reason" placeholder="Reason" required>
-                <button type="submit">Submit Defect</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h3>💸 Record Expense</h3>
-            <form method="POST" action="{{ url_for('cashier.record_expense') }}">
-                <label>Description:</label>
-                <input type="text" name="description" required>
-                <label>Amount ($):</label>
-                <input type="number" step="0.01" min="0" name="amount" required>
-                <button type="submit">Record Expense</button>
-            </form>
-        </div>
-        <div class="card">
-            <h3>➕ Record Extra Income</h3>
-            <form method="POST" action="{{ url_for('cashier.record_income') }}">
-                <label>Description</label>
-                <input type="text" name="description" required>
-                <label>Amount</label>
-                <input type="number" step="0.01" name="amount" required>
-                <button type="submit">Record Income</button>
-            </form>
-        </div>
-    </div>
+  </section>
 </div>
 
-</body>
-</html>
+<!-- ============ back-office requests ============ -->
+<div class="grid-2" style="margin-top:20px">
+  <section class="card">
+    <div class="card-header">Stock request</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('cashier.stock_request') }}">
+        <label>Product</label>
+        <select name="product_id" required>{% for p in products %}<option value="{{ p.id }}">{{ p.name[:70] }} (qty {{ p.quantity }})</option>{% endfor %}</select>
+        <div class="inline-fields">
+          <div><label>Quantity</label><input type="number" name="quantity" min="1" required></div>
+          <div><label>Action</label><select name="action" required><option value="add">Add stock</option><option value="deduct">Deduct stock</option></select></div>
+        </div>
+        <label>Reason (optional)</label><input type="text" name="reason" placeholder="Reason">
+        <button type="submit">Submit request</button>
+      </form>
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-header">Defect removal request</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('cashier.submit_defect') }}">
+        <label>Product</label>
+        <select name="product_id" required>{% for p in products %}<option value="{{ p.id }}">{{ p.name[:70] }} (qty {{ p.quantity }})</option>{% endfor %}</select>
+        <label>Quantity</label><input type="number" name="quantity" min="1" required>
+        <label>Reason</label><input type="text" name="reason" placeholder="What is wrong with it?" required>
+        <button type="submit">Submit defect</button>
+      </form>
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-header">Record expense</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('cashier.record_expense') }}">
+        <label>Description</label><input type="text" name="description" required>
+        <label>Amount ($)</label><input type="number" step="0.01" min="0" name="amount" required>
+        <button type="submit">Record expense</button>
+      </form>
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-header">Record extra income</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('cashier.record_income') }}">
+        <label>Description</label><input type="text" name="description" required>
+        <label>Amount ($)</label><input type="number" step="0.01" min="0" name="amount" required>
+        <button type="submit">Record income</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+{% if cart %}
+<script>
+/* Live totals. The server re-checks every number when the sale is saved, so this is a preview only. */
+(function () {
+  const SUB = {{ subtotal.v|round(2) }};
+  const LIMIT = {{ (discount_limit or 0)|float }};
+  const $ = id => document.getElementById(id);
+  const money = n => '$' + n.toFixed(2);
+  function update() {
+    const mode = document.querySelector('input[name=discount_mode]:checked').value;
+    const dv = Math.max(0, parseFloat($('discountValue').value) || 0);
+    const fee = Math.max(0, parseFloat($('deliveryFee').value) || 0);
+    let disc = mode === 'percent' ? SUB * dv / 100 : dv;
+    let msg = '';
+    if (mode === 'percent' && dv > 100) msg = 'A percentage can\u2019t be more than 100%.';
+    else if (disc > SUB + 0.0001) msg = 'The discount can\u2019t be more than the subtotal.';
+    else if (LIMIT && SUB > 0 && disc * 100 / SUB > LIMIT + 0.0001) msg = 'Discounts above ' + LIMIT + '% need an admin.';
+    disc = Math.min(disc, SUB);
+    $('rowDisc').hidden = disc <= 0; $('tDisc').textContent = '\u2212' + money(disc);
+    $('rowFee').hidden = fee <= 0;   $('tFee').textContent = '+' + money(fee);
+    $('tTotal').textContent = money(SUB - disc + fee);
+    $('tMsg').hidden = !msg; $('tMsg').textContent = msg;
+    $('addressBox').hidden = fee <= 0;
+    document.querySelectorAll('.pos-actions button').forEach(b => b.disabled = !!msg);
+  }
+  document.querySelectorAll('#saleForm input').forEach(i => i.addEventListener('input', update));
+  update();
+})();
+</script>
+{% endif %}
+{% endblock %}
