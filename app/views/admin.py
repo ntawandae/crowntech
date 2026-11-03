@@ -1045,17 +1045,30 @@ def create_user():
         flash("User already exists.", "warning")
         return redirect(url_for("admin.users"))
 
+    if len(password) < 8:
+        flash("The temporary password must be at least 8 characters.", "danger")
+        return redirect(url_for("admin.users"))
+
     user = User(
         username=email,
         full_name=full_name,
         role=role,
-        password=generate_password_hash(password)
+        password=generate_password_hash(password),
+        email_verified=True,          # an admin vouches for staff
+        must_change_password=True,    # they choose their own at first sign-in
     )
 
     db.session.add(user)
     db.session.commit()
 
-    flash("User created successfully.", "success")
+    try:
+        from ..services.mailer import abs_url, send_template
+        send_template(email, "Your Crown Tech Hub staff account", "staff_welcome", name=full_name, role=role,
+                      link=abs_url(url_for("auth.login")))
+    except Exception:
+        logger.exception("Could not queue the staff welcome email")
+
+    flash("User created. They will be asked to choose their own password at first sign-in.", "success")
     return redirect(url_for("admin.users"))
 
 @admin_bp.route("/users")
@@ -1104,10 +1117,11 @@ def reset_password(user_id):
 
     new_password = secrets.token_urlsafe(8)
     user.password = generate_password_hash(new_password)
+    user.must_change_password = True
 
     db.session.commit()
 
-    flash(f"Temporary password: {new_password}", "info")
+    flash(f"Temporary password: {new_password} (they will be asked to change it at next sign-in)", "info")
     return redirect(url_for("admin.users"))
 @admin_bp.route("/users/unlock-profile/<int:user_id>", methods=["POST"])
 @login_required

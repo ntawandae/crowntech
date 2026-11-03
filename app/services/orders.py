@@ -194,6 +194,7 @@ def mark_paid(order, method, reference=None, note=None):
     """
     if order.payment_status == "paid" and order.receipt_id:
         return order
+    already_paid = order.payment_status == "paid"
     get_system_user()  # make sure the internal account exists before we change the order
 
     # If the hold lapsed and stock was released, take it again or flag for staff.
@@ -240,6 +241,9 @@ def mark_paid(order, method, reference=None, note=None):
             pos.recompute_day(zim_now().date())
         except Exception:
             db.session.rollback()
+        if not already_paid and order.payment_status == "paid":
+            from .notify import notify_order
+            notify_order(order, "paid")
     return order
 
 

@@ -51,3 +51,11 @@ def clear_failures(key):
 
 def client_key(identity):
     return f"{request.remote_addr}|{(identity or '').lower()}"
+
+
+def verify_csrf():
+    """Call at the top of a POST handler whose blueprint isn't wrapped in protect_blueprint()."""
+    sent = request.form.get("_csrf", "")
+    expected = session.get("_csrf", "")
+    if not expected or not sent or not hmac.compare_digest(sent, expected):
+        abort(400, "Your session expired. Please go back, refresh the page and try again.")

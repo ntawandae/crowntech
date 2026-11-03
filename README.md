@@ -70,5 +70,17 @@ local day, so a sale at 23:00 appears on that day. Old records are not changed.
 Contract files now live in `instance/contracts/` (not under `static/`) and are served only to the owner or
 an admin. Any old files found in `static/uploads/contracts` are moved there on first start.
 
+## Accounts, email and Google sign-in
+* **Customers** confirm their email by link before they can sign in, and can reset a forgotten password by email.
+  Orders placed as a guest with the same email join the account once it is confirmed.
+* **Sign in with Google** (customers only) appears automatically once `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+  are set. If a Google email matches an admin or cashier account it is refused, so staff always use their password.
+* **Staff** accounts are created by an admin in Users. The admin sets a temporary password; the staff member must
+  choose their own at first sign-in (also after every admin password reset).
+* **Order emails:** reservation received, payment received (with receipt link), and order ready.
+* **Sending:** set the `MAIL_*` values (Aliyun Direct Mail SMTP). With `MAIL_SERVER` empty, emails are printed to the
+  console and saved in `instance/outbox/`, so every flow can be tested before the domain is live.
+* Links in emails use `PUBLIC_BASE_URL`, so set it to `https://crowntechhub.co.zw` in production.
+
 ## Tests
 `python tests/test_services.py` - payment clients, pricing, discount sharing, product text helpers.

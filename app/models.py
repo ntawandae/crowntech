@@ -10,6 +10,9 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(20), nullable=False)
     full_name = db.Column(db.String(100))  # your new column
+    email_verified = db.Column(db.Boolean, default=True)           # customers start False until they click the emailed link
+    must_change_password = db.Column(db.Boolean, default=False)    # staff must pick their own password after an admin sets/resets it
+    google_sub = db.Column(db.String(64), nullable=True, index=True)  # Google's id for the linked Google account
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -268,3 +271,18 @@ class Payment(db.Model):
     detail = db.Column(db.String(500))         # last status text from the provider (for staff)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AuthToken(db.Model):
+    """One-time links sent by email (verify address / reset password). Only a hash is stored."""
+    __tablename__ = "auth_token"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    purpose = db.Column(db.String(20), nullable=False)   # verify_email / reset_password
+    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime)
+
+    user = db.relationship("User", foreign_keys=[user_id])

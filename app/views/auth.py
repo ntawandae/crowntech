@@ -3,7 +3,7 @@ from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from ..models import User, UserProfile
 from .. import db
-from ..security import clear_failures, client_key, record_failure, safe_next, throttled
+from ..security import verify_csrf, clear_failures, client_key, record_failure, safe_next, throttled
 from werkzeug.utils import secure_filename
 import secrets
 import os
@@ -174,3 +174,27 @@ def contract(user_id):
     if not os.path.isfile(path):
         abort(404)
     return send_file(path, as_attachment=False)
+
+
+@auth_bp.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password_first():
+    """Shown to staff whose password was set/reset by an admin, until they choose their own."""
+    if not current_user.must_change_password:
+        return redirect(_home_for(current_user))
+    if request.method == "POST":
+        verify_csrf()
+        new, confirm = request.form.get("new_password", ""), request.form.get("confirm_password", "")
+        if len(new) < 8:
+            flash("Choose a password with at least 8 characters.", "danger")
+        elif new != confirm:
+            flash("The two passwords don't match.", "danger")
+        elif check_password_hash(current_user.password, new):
+            flash("Choose a different password from the temporary one.", "danger")
+        else:
+            current_user.password = generate_password_hash(new)
+            current_user.must_change_password = False
+            db.session.commit()
+            flash("Password updated. Welcome aboard!", "success")
+            return redirect(_home_for(current_user))
+    return render_template("auth/change_password.html")

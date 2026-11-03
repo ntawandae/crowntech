@@ -17,6 +17,14 @@ from ..services import orders as order_svc
 from ..services.orders import OrderError
 from ..services.paynow import PaynowClient, PaynowError, is_failed, is_paid, parse_message, verify_pairs
 from ..services.paypal import PayPalClient, PayPalError
+import hmac
+import secrets
+from datetime import timedelta
+
+from ..services import tokens
+from ..services.google_auth import GoogleAuthError, build_auth_url, fetch_profile
+from ..services.mailer import abs_url, send_template
+from ..services.notify import notify_order
 from ..services.specs import CATEGORY_ORDER, CATEGORY_TONE, extract_specs, normalize_category, short_title, clean_text
 
 shop_bp = Blueprint("shop", __name__)
@@ -356,6 +364,7 @@ def checkout():
                 return redirect(url_for("shop.cart"))
             save_cart({})
             if order.payment_method == "pay_at_shop":
+                notify_order(order, "received")
                 flash("Order placed. We're holding your items for you.", "success")
                 return redirect(order_url(order))
             return start_payment(order, order.payment_method)
@@ -579,6 +588,28 @@ def home_for(user):
     return url_for("shop.account")
 
 
+def send_verification(user):
+    raw = tokens.issue(user, tokens.VERIFY, timedelta(hours=current_app.config["EMAIL_LINK_HOURS_VERIFY"]))
+    send_template(user.username, f"Confirm your email for {current_app.config['BUSINESS_NAME']}", "verify",
+                  name=user.full_name, link=abs_url(url_for("shop.verify_email", token=raw)),
+                  hours=current_app.config["EMAIL_LINK_HOURS_VERIFY"])
+
+
+def attach_guest_orders(user):
+    """Orders placed as a guest with this (now verified) email become part of the account."""
+    Order.query.filter(Order.user_id.is_(None), Order.customer_email == user.username).update(
+        {Order.user_id: user.id}, synchronize_session=False)
+    db.session.commit()
+
+
+def throttle_email_request(kind, email, limit=4, window=3600):
+    key = client_key(f"{kind}:{email}")
+    if throttled(key, limit=limit, window=window):
+        return True
+    record_failure(key)
+    return False
+
+
 @shop_bp.route("/account/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
@@ -595,18 +626,84 @@ def register():
         elif len(password) < 8:
             error = "Choose a password with at least 8 characters."
         elif User.query.filter_by(username=email).first():
-            error = "An account with that email already exists. Try signing in."
+            error = "An account with that email already exists. Sign in, or use \"Forgot password\"."
         if error:
             flash(error, "danger")
         else:
             from werkzeug.security import generate_password_hash
-            user = User(username=email, password=generate_password_hash(password), role="customer", full_name=name)
+            user = User(username=email, password=generate_password_hash(password), role="customer",
+                        full_name=name, email_verified=False)
             db.session.add(user)
             db.session.commit()
-            login_user(user)
-            flash("Welcome to Crown Tech Hub. Your account is ready.", "success")
-            return redirect(safe_next(request.args.get("next"), url_for("shop.account")))
+            send_verification(user)
+            return render_template("shop/check_email.html", email=email, kind="verify")
     return render_template("shop/register.html")
+
+
+@shop_bp.route("/account/verify/<token>")
+def verify_email(token):
+    row = tokens.find(token, tokens.VERIFY)
+    if not row:
+        flash("That confirmation link has expired or was already used. Request a new one below.", "warning")
+        return redirect(url_for("shop.resend_verification"))
+    user = row.user
+    user.email_verified = True
+    tokens.consume(row)
+    attach_guest_orders(user)
+    flash("Email confirmed. You can sign in now.", "success")
+    return redirect(url_for("shop.account_login"))
+
+
+@shop_bp.route("/account/verify/resend", methods=["GET", "POST"])
+def resend_verification():
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        if EMAIL_RE.match(email) and not throttle_email_request("verify", email):
+            user = User.query.filter_by(username=email, role="customer").first()
+            if user and not user.email_verified:
+                send_verification(user)
+        # same answer whether or not the address exists, so this can't be used to probe for accounts
+        return render_template("shop/check_email.html", email=email, kind="verify")
+    return render_template("shop/resend.html")
+
+
+@shop_bp.route("/account/forgot", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        if EMAIL_RE.match(email) and not throttle_email_request("reset", email):
+            user = User.query.filter_by(username=email, role="customer").first()
+            if user:
+                raw = tokens.issue(user, tokens.RESET, timedelta(minutes=current_app.config["EMAIL_LINK_MINUTES_RESET"]))
+                send_template(user.username, f"Reset your {current_app.config['BUSINESS_NAME']} password", "reset",
+                              name=user.full_name, link=abs_url(url_for("shop.reset_password", token=raw)),
+                              minutes=current_app.config["EMAIL_LINK_MINUTES_RESET"])
+        return render_template("shop/check_email.html", email=email, kind="reset")
+    return render_template("shop/forgot.html")
+
+
+@shop_bp.route("/account/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    row = tokens.find(token, tokens.RESET)
+    if not row:
+        flash("That reset link has expired or was already used. Request a new one.", "warning")
+        return redirect(url_for("shop.forgot_password"))
+    if request.method == "POST":
+        new, confirm = request.form.get("password", ""), request.form.get("confirm", "")
+        if len(new) < 8:
+            flash("Choose a password with at least 8 characters.", "danger")
+        elif new != confirm:
+            flash("The two passwords don't match.", "danger")
+        else:
+            from werkzeug.security import generate_password_hash
+            user = row.user
+            user.password = generate_password_hash(new)
+            user.email_verified = True     # they just proved they control this inbox
+            tokens.consume(row)
+            attach_guest_orders(user)
+            flash("Password updated. Sign in with your new password.", "success")
+            return redirect(url_for("shop.account_login"))
+    return render_template("shop/reset.html", token=token)
 
 
 @shop_bp.route("/account/login", methods=["GET", "POST"])
@@ -624,6 +721,9 @@ def account_login():
         if user and user.role in ("disabled", "system"):
             flash("This account is disabled.", "danger")
         elif user and check_password_hash(user.password, request.form.get("password") or ""):
+            if user.role == "customer" and not user.email_verified:
+                flash("Please confirm your email first. We sent you a link when you signed up.", "warning")
+                return render_template("shop/login.html", unverified_email=email)
             clear_failures(key)
             login_user(user)
             return redirect(safe_next(request.args.get("next"), home_for(user)))
@@ -631,6 +731,62 @@ def account_login():
             record_failure(key)
             flash("That email and password don't match.", "danger")
     return render_template("shop/login.html")
+
+
+# ---------------- Sign in with Google (customers only) ----------------
+def google_enabled():
+    c = current_app.config
+    return bool(c["GOOGLE_CLIENT_ID"] and c["GOOGLE_CLIENT_SECRET"])
+
+
+@shop_bp.route("/account/google")
+def google_start():
+    if not google_enabled():
+        abort(404)
+    state = secrets.token_urlsafe(24)
+    session["g_state"] = state
+    session["g_next"] = safe_next(request.args.get("next"), "")
+    return redirect(build_auth_url(current_app.config["GOOGLE_CLIENT_ID"],
+                                   public_base() + url_for("shop.google_callback"), state))
+
+
+@shop_bp.route("/account/google/callback")
+def google_callback():
+    if not google_enabled():
+        abort(404)
+    expected = session.pop("g_state", None)
+    got = request.args.get("state", "")
+    if not expected or not hmac.compare_digest(expected, got) or request.args.get("error") or not request.args.get("code"):
+        flash("Google sign-in was cancelled or couldn't be verified. Please try again.", "warning")
+        return redirect(url_for("shop.account_login"))
+    try:
+        profile = fetch_profile(current_app.config["GOOGLE_CLIENT_ID"], current_app.config["GOOGLE_CLIENT_SECRET"],
+                                public_base() + url_for("shop.google_callback"), request.args["code"])
+    except GoogleAuthError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("shop.account_login"))
+
+    user = User.query.filter_by(google_sub=profile["sub"]).first()
+    if not user:
+        user = User.query.filter_by(username=profile["email"]).first()
+        if user and user.role != "customer":
+            flash("That email belongs to a staff account. Staff sign in with their work password.", "danger")
+            return redirect(url_for("auth.login"))
+        if user:                                    # existing customer: link Google to it
+            user.google_sub = profile["sub"]
+            user.email_verified = True
+        else:                                       # brand new customer
+            from werkzeug.security import generate_password_hash
+            user = User(username=profile["email"], password=generate_password_hash(secrets.token_urlsafe(32)),
+                        role="customer", full_name=profile["name"], email_verified=True, google_sub=profile["sub"])
+            db.session.add(user)
+        db.session.commit()
+        attach_guest_orders(user)
+    if user.role in ("disabled", "system"):
+        flash("This account is disabled.", "danger")
+        return redirect(url_for("shop.account_login"))
+    login_user(user)
+    return redirect(safe_next(session.pop("g_next", ""), home_for(user)))
 
 
 @shop_bp.route("/account")

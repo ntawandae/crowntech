@@ -1,0 +1,8 @@
+Hi {{ name }},
+
+An admin has created a {{ role }} account for you at {{ biz_name }}.
+
+Sign in with the temporary password they gave you; you'll be asked to choose your own straight away:
+{{ link }}
+
+{{ biz_name }}

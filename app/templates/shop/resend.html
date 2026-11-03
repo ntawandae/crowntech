@@ -1,0 +1,13 @@
+{% extends 'shop/base.html' %}
+{% block title %}Confirm your email | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap"><div class="panel auth-card">
+  <h1 style="font-size:1.7rem">Confirm your email</h1>
+  <p class="muted">Enter the email you signed up with and we'll send a new confirmation link.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="email">Email</label><input id="email" type="email" name="email" autocomplete="username" required></div>
+    <button class="btn btn-gold btn-block" type="submit">Send the link</button>
+  </form>
+</div></div>
+{% endblock %}

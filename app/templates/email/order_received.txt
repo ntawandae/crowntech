@@ -1,0 +1,11 @@
+Hi {{ order.customer_name }},
+
+We've reserved your items under order {{ order.order_number }}. Pay when you collect; we'll hold them until {{ order.expires_at|when }}.
+
+{% for i in order.items %}- {{ i.product_name.split("|")[0][:80] }} x {{ i.quantity }}: {{ i.line_total|money }}
+{% endfor %}{% if order.delivery_fee %}Delivery: {{ order.delivery_fee|money }}
+{% endif %}Total: {{ order.total|money }}
+
+View your order: {{ link }}
+
+{{ biz_name }}, {{ biz_address }}

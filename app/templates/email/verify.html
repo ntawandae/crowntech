@@ -1,0 +1,4 @@
+{% extends "email/_layout.html" %}
+{% block body %}
+<p>Hi {{ name }},</p><p>Thanks for signing up. Please confirm your email address to finish setting up your account.</p><p><a href="{{ link }}" style="display:inline-block;background:#f2b01e;color:#2a1d00;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:999px">Confirm my email</a></p><p style="color:#54617a;font-size:13px">This link works for {{ hours }} hours. If you didn't sign up, you can ignore this email.</p>
+{% endblock %}

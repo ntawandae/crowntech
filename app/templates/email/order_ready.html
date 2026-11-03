@@ -1,0 +1,4 @@
+{% extends "email/_layout.html" %}
+{% block body %}
+<p>Hi {{ order.customer_name }},</p><p>Good news: order <strong>{{ order.order_number }}</strong> is ready{% if order.delivery_method == 'delivery' %} and on its way to you{% else %} for collection at {{ biz_address }}{% endif %}.</p><p><a href="{{ link }}" style="display:inline-block;background:#f2b01e;color:#2a1d00;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:999px">View your order</a></p>
+{% endblock %}

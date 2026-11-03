@@ -1,0 +1,13 @@
+{% extends 'shop/base.html' %}
+{% block title %}Choose a new password | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap"><div class="panel auth-card">
+  <h1 style="font-size:1.7rem">Choose a new password</h1>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="password">New password</label><input id="password" type="password" name="password" autocomplete="new-password" minlength="8" required><div class="hint">At least 8 characters.</div></div>
+    <div class="field"><label for="confirm">Confirm password</label><input id="confirm" type="password" name="confirm" autocomplete="new-password" minlength="8" required></div>
+    <button class="btn btn-gold btn-block" type="submit">Save password</button>
+  </form>
+</div></div>
+{% endblock %}

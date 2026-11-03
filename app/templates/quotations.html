@@ -16,7 +16,7 @@
 
     <label>Items</label>
     <div class="table-responsive" style="margin-bottom:10px">
-      <table id="itemsTable">
+      <table id="itemsTable" class="stack-sm">
         <thead><tr><th style="min-width:260px">Product</th><th style="width:90px">Qty</th><th style="width:130px">Unit price</th><th class="r" style="width:120px">Line total</th><th style="width:60px"></th></tr></thead>
         <tbody></tbody>
       </table>
@@ -48,18 +48,18 @@
 <div class="card">
   <div class="card-header">{{ 'All quotations' if ep == 'admin' else 'My quotations' }}</div>
   <div class="table-responsive">
-    <table>
+    <table class="stack-sm">
       <thead><tr><th>Number</th><th>Customer</th>{% if ep == 'admin' %}<th>By</th>{% endif %}<th>Date</th><th class="r">Total</th><th>Status</th><th></th></tr></thead>
       <tbody>
       {% for q in quotations %}
         <tr>
-          <td><b>{{ q.quotation_number }}</b></td>
-          <td>{{ q.customer_name or '-' }}</td>
-          {% if ep == 'admin' %}<td>{{ q.created_by.full_name if q.created_by else '-' }}</td>{% endif %}
-          <td>{{ q.created_at.strftime('%d %b %Y') if q.created_at else '' }}</td>
-          <td class="r num">${{ "%.2f"|format(q.total_price - (q.discount or 0)) }}{% if q.discount %}<div class="hint">after ${{ "%.2f"|format(q.discount) }} off</div>{% endif %}</td>
-          <td>{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}</td>
-          <td class="r" style="white-space:nowrap">
+          <td data-label="Number"><b>{{ q.quotation_number }}</b></td>
+          <td data-label="Customer">{{ q.customer_name or '-' }}</td>
+          {% if ep == 'admin' %}<td data-label="By">{{ q.created_by.full_name if q.created_by else '-' }}</td>{% endif %}
+          <td data-label="Date">{{ q.created_at.strftime('%d %b %Y') if q.created_at else '' }}</td>
+          <td class="r num" data-label="Total">${{ "%.2f"|format(q.total_price - (q.discount or 0)) }}{% if q.discount %}<div class="hint">after ${{ "%.2f"|format(q.discount) }} off</div>{% endif %}</td>
+          <td data-label="Status">{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}</td>
+          <td class="r full" style="white-space:nowrap">
             <a class="btn btn-ghost btn-sm" href="{{ url_for(ep ~ '.download_quotation', quotation_id=q.id) }}">PDF</a>
             {% if not q.converted %}
               <a class="btn btn-ghost btn-sm" href="{{ url_for(ep ~ '.edit_quotation', quotation_id=q.id) }}">Edit</a>
@@ -70,7 +70,7 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="7"><div class="empty-state">No quotations yet.</div></td></tr>
+        <tr><td colspan="7" class="full"><div class="empty-state">No quotations yet.</div></td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -106,11 +106,11 @@ function addRow(item) {
   const opts = '<option value="">Choose a product...</option>' +
     CATALOG.map(p => `<option value="${p.id}" data-price="${p.price}">${p.name.replace(/</g,'&lt;')} (${p.qty} in stock)</option>`).join('') +
     '<option value="__custom__">Custom item (not in stock list)</option>';
-  tr.innerHTML = `<td><select class="pid">${opts}</select><input type="text" class="cname" placeholder="Item name" hidden></td>
-    <td><input type="number" class="qty" min="1" step="1" value="1"></td>
-    <td><input type="number" class="price" min="0" step="0.01" value="0"></td>
-    <td class="r num line">$0.00</td>
-    <td><button type="button" class="btn-danger btn-sm rm" aria-label="Remove">&times;</button></td>`;
+  tr.innerHTML = `<td class="full"><select class="pid">${opts}</select><input type="text" class="cname" placeholder="Item name" hidden></td>
+    <td data-label="Qty"><input type="number" class="qty" min="1" step="1" value="1" inputmode="numeric"></td>
+    <td data-label="Unit price"><input type="number" class="price" min="0" step="0.01" value="0" inputmode="decimal"></td>
+    <td class="r num line" data-label="Line total">$0.00</td>
+    <td class="full"><button type="button" class="btn-danger btn-sm rm" aria-label="Remove item">Remove</button></td>`;
   body.appendChild(tr);
   const pid = tr.querySelector('.pid'), cname = tr.querySelector('.cname');
   pid.addEventListener('change', () => {

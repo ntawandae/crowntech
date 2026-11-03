@@ -1,0 +1,14 @@
+Hi {{ order.customer_name }},
+
+Thank you. We've received your payment for order {{ order.order_number }}.
+
+{% for i in order.items %}- {{ i.product_name.split("|")[0][:80] }} x {{ i.quantity }}: {{ i.line_total|money }}
+{% endfor %}{% if order.delivery_fee %}Delivery: {{ order.delivery_fee|money }}
+{% endif %}Total: {{ order.total|money }}
+
+View your order: {{ link }}
+{% if receipt_link %}Receipt (PDF): {{ receipt_link }}
+{% endif %}
+We'll email you again when it's ready.
+
+{{ biz_name }}

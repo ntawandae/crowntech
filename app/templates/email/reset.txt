@@ -1,0 +1,8 @@
+Hi {{ name }},
+
+We got a request to reset your password. Choose a new one here:
+{{ link }}
+
+This link works for {{ minutes }} minutes. If you didn't ask for this, ignore this email - your password stays the same.
+
+{{ biz_name }}

@@ -1,0 +1,7 @@
+Hi {{ order.customer_name }},
+
+Good news: order {{ order.order_number }} is ready{% if order.delivery_method == 'delivery' %} and on its way to you{% else %} for collection at {{ biz_address }}{% endif %}.
+
+View your order: {{ link }}
+
+{{ biz_name }}

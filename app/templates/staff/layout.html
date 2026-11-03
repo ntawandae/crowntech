@@ -96,6 +96,20 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+<nav class="tabbar" aria-label="Quick links">
+{% if is_admin %}
+  <a href="{{ url_for('admin.admin_dashboard', view='overview') }}" class="{{ 'active' if ep == 'admin.admin_dashboard' and view in ('', 'overview', 'dashboard') }}"><svg class="i"><use href="#i-grid"/></svg>Home</a>
+  <a href="{{ url_for('admin.view_sales') }}" class="{{ 'active' if ep == 'admin.view_sales' }}"><svg class="i"><use href="#i-receipt"/></svg>Sales</a>
+  <a href="{{ url_for('staff_orders.order_list') }}" class="{{ 'active' if ep.startswith('staff_orders.') }}"><svg class="i"><use href="#i-bag"/></svg>Orders{% if staff_pending_orders %}<span class="count">{{ staff_pending_orders }}</span>{% endif %}</a>
+  <a href="{{ url_for('admin.admin_dashboard', view='products') }}" class="{{ 'active' if ep == 'admin.admin_dashboard' and view == 'products' }}"><svg class="i"><use href="#i-box"/></svg>Products</a>
+{% else %}
+  <a href="{{ url_for('cashier.cashier_dashboard') }}" class="{{ 'active' if ep == 'cashier.cashier_dashboard' }}"><svg class="i"><use href="#i-till"/></svg>Till</a>
+  <a href="{{ url_for('cashier.quotations') }}" class="{{ 'active' if ep in ('cashier.quotations', 'cashier.edit_quotation') }}"><svg class="i"><use href="#i-file"/></svg>Quotes</a>
+  <a href="{{ url_for('staff_orders.order_list') }}" class="{{ 'active' if ep.startswith('staff_orders.') }}"><svg class="i"><use href="#i-bag"/></svg>Orders{% if staff_pending_orders %}<span class="count">{{ staff_pending_orders }}</span>{% endif %}</a>
+  <a href="{{ url_for('cashier.daily_report') }}" class="{{ 'active' if ep == 'cashier.daily_report' }}"><svg class="i"><use href="#i-chart"/></svg>Report</a>
+{% endif %}
+  <button type="button" onclick="document.body.classList.toggle('nav-open')" aria-label="More"><svg class="i"><use href="#i-menu"/></svg>More</button>
+</nav>
 {% block scripts %}{% endblock %}
 </body>
 </html>

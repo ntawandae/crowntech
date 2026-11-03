@@ -25,16 +25,16 @@ function filterTable() {
     <div class="card-body">
       <input type="search" id="searchInput" onkeyup="filterTable()" placeholder="Search products by name..." aria-label="Search products">
       <div class="table-scroll table-responsive" style="margin:0">
-        <table id="productTable">
+        <table id="productTable" class="stack-sm">
           <thead><tr><th>Product</th><th>In stock</th><th class="r">Price</th><th></th></tr></thead>
           <tbody>
           {% for p in products %}
             <tr>
               <td class="product-name" title="{{ p.name }}">{{ p.name[:80] }}</td>
-              <td><span class="stock-pill {{ 'out' if p.quantity < 1 else ('low' if p.quantity <= 2) }}">{{ p.quantity }}</span></td>
-              <td class="r num">${{ '%.2f' % p.price }}</td>
+              <td data-label="In stock"><span class="stock-pill {{ 'out' if p.quantity < 1 else ('low' if p.quantity <= 2) }}">{{ p.quantity }}</span></td>
+              <td class="r num" data-label="Price">${{ '%.2f' % p.price }}</td>
               <td class="r">
-                <form method="POST" action="{{ url_for('cashier.add_one_to_cart', product_id=p.id) }}">
+                <form method="POST" class="js-cart" action="{{ url_for('cashier.add_one_to_cart', product_id=p.id) }}">
                   <button type="submit" class="btn-sm" {% if p.quantity < 1 %}disabled{% endif %}>Add</button>
                 </form>
               </td>
@@ -47,7 +47,8 @@ function filterTable() {
   </section>
 
   <!-- ============ cart + payment ============ -->
-  <section class="card pos-cart">
+  <div id="cartPanel">
+  <section class="card pos-cart" id="saleCart" data-subtotal="{{ subtotal.v|round(2) }}" data-limit="{{ (discount_limit or 0)|float }}">
     <div class="card-header">Current sale</div>
     <div class="card-body">
     {% if cart %}
@@ -56,9 +57,9 @@ function filterTable() {
         <div class="cart-line">
           <div><div class="nm" title="{{ item.name }}">{{ item.name }}</div><div class="unit num">${{ "%.2f"|format(item.price) }} each</div></div>
           <div class="qty">
-            <form method="POST" action="{{ url_for('cashier.decrement_cart', product_id=item.id) }}"><button type="submit" aria-label="Fewer">&minus;</button></form>
+            <form method="POST" class="js-cart" action="{{ url_for('cashier.decrement_cart', product_id=item.id) }}"><button type="submit" aria-label="Fewer">&minus;</button></form>
             <b>{{ item.quantity }}</b>
-            <form method="POST" action="{{ url_for('cashier.increment_cart', product_id=item.id) }}"><button type="submit" aria-label="More">+</button></form>
+            <form method="POST" class="js-cart" action="{{ url_for('cashier.increment_cart', product_id=item.id) }}"><button type="submit" aria-label="More">+</button></form>
           </div>
           <div class="num"><b>${{ "%.2f"|format(item.price * item.quantity) }}</b></div>
         </div>
@@ -106,7 +107,7 @@ function filterTable() {
           <button type="submit" class="big btn-gold" formaction="{{ url_for('cashier.sell_and_receipt') }}">Sale &amp; receipt</button>
         </div>
       </form>
-      <form method="POST" action="{{ url_for('cashier.clear_cart') }}" style="margin-top:10px">
+      <form method="POST" class="js-cart" action="{{ url_for('cashier.clear_cart') }}" style="margin-top:10px">
         <button type="submit" class="btn-danger btn-sm">Clear cart</button>
       </form>
     {% else %}
@@ -114,6 +115,10 @@ function filterTable() {
     {% endif %}
     </div>
   </section>
+  {% if cart %}
+  <a href="#saleCart" class="cart-bar" id="cartBar"><span>{{ cart|sum(attribute='quantity') }} item{{ '' if (cart|sum(attribute='quantity')) == 1 else 's' }}</span><b>${{ "%.2f"|format(subtotal.v) }}</b><span class="go">Review sale</span></a>
+  {% endif %}
+  </div>
 </div>
 
 <!-- ============ back-office requests ============ -->
@@ -167,34 +172,61 @@ function filterTable() {
   </section>
 </div>
 
-{% if cart %}
 <script>
-/* Live totals. The server re-checks every number when the sale is saved, so this is a preview only. */
+/* Totals preview + no-reload cart. The server re-checks every number when the sale is saved. */
 (function () {
-  const SUB = {{ subtotal.v|round(2) }};
-  const LIMIT = {{ (discount_limit or 0)|float }};
   const $ = id => document.getElementById(id);
   const money = n => '$' + n.toFixed(2);
-  function update() {
-    const mode = document.querySelector('input[name=discount_mode]:checked').value;
-    const dv = Math.max(0, parseFloat($('discountValue').value) || 0);
-    const fee = Math.max(0, parseFloat($('deliveryFee').value) || 0);
-    let disc = mode === 'percent' ? SUB * dv / 100 : dv;
-    let msg = '';
-    if (mode === 'percent' && dv > 100) msg = 'A percentage can\u2019t be more than 100%.';
-    else if (disc > SUB + 0.0001) msg = 'The discount can\u2019t be more than the subtotal.';
-    else if (LIMIT && SUB > 0 && disc * 100 / SUB > LIMIT + 0.0001) msg = 'Discounts above ' + LIMIT + '% need an admin.';
-    disc = Math.min(disc, SUB);
-    $('rowDisc').hidden = disc <= 0; $('tDisc').textContent = '\u2212' + money(disc);
-    $('rowFee').hidden = fee <= 0;   $('tFee').textContent = '+' + money(fee);
-    $('tTotal').textContent = money(SUB - disc + fee);
-    $('tMsg').hidden = !msg; $('tMsg').textContent = msg;
-    $('addressBox').hidden = fee <= 0;
-    document.querySelectorAll('.pos-actions button').forEach(b => b.disabled = !!msg);
+
+  function initTotals() {
+    const box = $('saleCart'); if (!box || !$('saleForm')) return;
+    const SUB = parseFloat(box.dataset.subtotal) || 0, LIMIT = parseFloat(box.dataset.limit) || 0;
+    function update() {
+      const mode = document.querySelector('input[name=discount_mode]:checked').value;
+      const dv = Math.max(0, parseFloat($('discountValue').value) || 0);
+      const fee = Math.max(0, parseFloat($('deliveryFee').value) || 0);
+      let disc = mode === 'percent' ? SUB * dv / 100 : dv, msg = '';
+      if (mode === 'percent' && dv > 100) msg = 'A percentage can\u2019t be more than 100%.';
+      else if (disc > SUB + 0.0001) msg = 'The discount can\u2019t be more than the subtotal.';
+      else if (LIMIT && SUB > 0 && disc * 100 / SUB > LIMIT + 0.0001) msg = 'Discounts above ' + LIMIT + '% need an admin.';
+      disc = Math.min(disc, SUB);
+      $('rowDisc').hidden = disc <= 0; $('tDisc').textContent = '\u2212' + money(disc);
+      $('rowFee').hidden = fee <= 0;   $('tFee').textContent = '+' + money(fee);
+      $('tTotal').textContent = money(SUB - disc + fee);
+      $('tMsg').hidden = !msg; $('tMsg').textContent = msg;
+      $('addressBox').hidden = fee <= 0;
+      document.querySelectorAll('.pos-actions button').forEach(b => b.disabled = !!msg);
+    }
+    document.querySelectorAll('#saleForm input').forEach(i => i.addEventListener('input', update));
+    update();
   }
-  document.querySelectorAll('#saleForm input').forEach(i => i.addEventListener('input', update));
-  update();
+
+  async function submitCart(form) {
+    const btn = form.querySelector('button'); if (btn) btn.disabled = true;
+    try {
+      const res = await fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' });
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const fresh = doc.getElementById('cartPanel');
+      if (!fresh) { window.location.reload(); return; }
+      const keep = { d: $('discountValue') && $('discountValue').value, f: $('deliveryFee') && $('deliveryFee').value };
+      $('cartPanel').innerHTML = fresh.innerHTML;
+      if ($('discountValue') && keep.d != null) $('discountValue').value = keep.d;
+      if ($('deliveryFee') && keep.f != null) $('deliveryFee').value = keep.f;
+      let flashes = document.querySelector('.flashes'); const nf = doc.querySelector('.flashes');
+      if (nf && nf.children.length) {
+        if (!flashes) { flashes = document.createElement('div'); flashes.className = 'flashes'; flashes.setAttribute('role', 'status'); document.querySelector('.app-main').prepend(flashes); }
+        flashes.innerHTML = nf.innerHTML;
+      } else if (flashes) flashes.remove();
+      initTotals();
+      const bar = $('cartBar'); if (bar) { bar.classList.add('pop'); setTimeout(() => bar.classList.remove('pop'), 400); }
+    } catch (e) { form.submit(); }
+    if (btn) btn.disabled = false;
+  }
+  document.addEventListener('submit', e => {
+    const f = e.target.closest && e.target.closest('form.js-cart');
+    if (f) { e.preventDefault(); submitCart(f); }
+  });
+  initTotals();
 })();
 </script>
-{% endif %}
 {% endblock %}

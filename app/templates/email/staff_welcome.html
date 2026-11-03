@@ -1,0 +1,4 @@
+{% extends "email/_layout.html" %}
+{% block body %}
+<p>Hi {{ name }},</p><p>An admin has created a <strong>{{ role }}</strong> account for you at {{ biz_name }}.</p><p>Sign in with the temporary password they gave you. You'll be asked to choose your own password straight away.</p><p><a href="{{ link }}" style="display:inline-block;background:#f2b01e;color:#2a1d00;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:999px">Go to sign in</a></p>
+{% endblock %}

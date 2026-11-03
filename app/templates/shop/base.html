@@ -15,21 +15,12 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 {% block header %}
-<div class="promo"><div class="wrap">
-  <span>Pay with Paynow, PayPal or at the shop</span>
-  <span>Collect in store or get it delivered</span>
-  {% if biz.whatsapp %}<a href="https://wa.me/{{ biz.whatsapp }}">Order on WhatsApp</a>{% endif %}
-</div></div>
 <header class="site-head">
   <div class="wrap head-row">
     <a class="brand" href="{{ url_for('shop.home') }}">
       <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="42" height="42">
       <span>{{ biz.name }}</span>
     </a>
-    <form class="head-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
-      <input type="search" name="q" value="{{ q|default('') }}" placeholder="Search laptops, phones, accessories" aria-label="Search products">
-      <button class="btn" type="submit">Search</button>
-    </form>
     <nav class="head-nav" aria-label="Main">
       <a href="{{ url_for('shop.catalog') }}" {% if request.endpoint in ('shop.catalog','shop.product') %}aria-current="page"{% endif %}>Shop</a>
       <a class="hide-sm" href="{{ url_for('shop.track') }}">Track order</a>

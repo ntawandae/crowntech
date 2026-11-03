@@ -1,0 +1,14 @@
+{% extends 'shop/base.html' %}
+{% block title %}Forgot password | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap"><div class="panel auth-card">
+  <h1 style="font-size:1.7rem">Forgot your password?</h1>
+  <p class="muted">Enter your email and we'll send you a link to choose a new one.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="email">Email</label><input id="email" type="email" name="email" autocomplete="username" required></div>
+    <button class="btn btn-gold btn-block" type="submit">Email me a reset link</button>
+  </form>
+  <p class="small muted" style="margin:14px 0 0">Staff: ask an admin to reset your password.</p>
+</div></div>
+{% endblock %}

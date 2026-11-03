@@ -88,7 +88,9 @@ def order_action(order_id):
                 raise OrderError("Record the payment before marking the order ready.")
             order.status = "ready"
             db.session.commit()
-            flash("Order marked ready.", "success")
+            from ..services.notify import notify_order
+            notify_order(order, "ready")
+            flash("Order marked ready. The customer has been emailed.", "success")
         elif action == "complete":
             if order.payment_status != "paid":
                 raise OrderError("Record the payment before completing the order.")

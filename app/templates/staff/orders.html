@@ -15,17 +15,17 @@
 </nav>
 
 {% if pagination.items %}
-<div class="table-wrap"><table class="tbl">
+<div class="table-wrap"><table class="tbl stack-sm">
   <thead><tr><th>Order</th><th>Customer</th><th>Placed</th><th>Method</th><th>Status</th><th class="r">Total</th></tr></thead>
   <tbody>
   {% for o in pagination.items %}
     <tr>
       <td><a href="{{ url_for('staff_orders.order_detail', order_id=o.id) }}"><strong>{{ o.order_number }}</strong></a><div class="muted small">{{ o.items|length }} item{{ '' if o.items|length == 1 else 's' }}</div></td>
       <td>{{ o.customer_name }}<div class="muted small">{{ o.customer_phone }}</div></td>
-      <td class="small">{{ o.created_at|when }}</td>
+      <td class="small" data-label="Placed">{{ o.created_at|when }}</td>
       <td class="small">{{ 'Delivery' if o.delivery_method == 'delivery' else 'Collect' }}<div class="muted">{{ {'paynow':'Paynow','paypal':'PayPal','pay_at_shop':'Pay at shop','manual':'Manual'}.get(o.payment_method, '-') }}</div></td>
-      <td><span class="badge {{ 'badge-ok' if o.status in ('paid','ready','completed') else ('badge-bad' if o.status == 'cancelled' else 'badge-warn') }}">{{ o.status_label }}</span></td>
-      <td class="r num">{{ o.total|money }}</td>
+      <td data-label="Status"><span class="badge {{ 'badge-ok' if o.status in ('paid','ready','completed') else ('badge-bad' if o.status == 'cancelled' else 'badge-warn') }}">{{ o.status_label }}</span></td>
+      <td class="r num" data-label="Total">{{ o.total|money }}</td>
     </tr>
   {% endfor %}
   </tbody>

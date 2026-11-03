@@ -74,6 +74,24 @@ class Config:
     # Largest discount (% of subtotal) a cashier may give. 0 = no limit. Admins are never limited.
     CASHIER_MAX_DISCOUNT_PERCENT = float(os.environ.get("CASHIER_MAX_DISCOUNT_PERCENT", "0"))
 
+    # --- Email (Aliyun Direct Mail or any SMTP service) ----------------------------------
+    # Leave MAIL_SERVER empty during development: emails are then printed to the console and saved
+    # in instance/outbox/ instead of being sent.
+    MAIL_SERVER = os.environ.get("MAIL_SERVER", "")
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", "465"))
+    MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", True)        # port 465
+    MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", False)       # STARTTLS (e.g. port 80/25/587), when SSL is off
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")   # the sender address you created in Direct Mail
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")   # the SMTP password set in the Direct Mail console
+    MAIL_FROM = os.environ.get("MAIL_FROM", "info@crowntechhub.co.zw")
+    MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", os.environ.get("BUSINESS_NAME", "Crown Tech Hub"))
+    EMAIL_LINK_HOURS_VERIFY = int(os.environ.get("EMAIL_LINK_HOURS_VERIFY", "24"))
+    EMAIL_LINK_MINUTES_RESET = int(os.environ.get("EMAIL_LINK_MINUTES_RESET", "60"))
+
+    # --- Sign in with Google (customers only) ----------------------------------------
+    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+
     # --- Paynow ----------------------------------------------------------
     PAYNOW_INTEGRATION_ID = os.environ.get("PAYNOW_INTEGRATION_ID", "")
     PAYNOW_INTEGRATION_KEY = os.environ.get("PAYNOW_INTEGRATION_KEY", "")

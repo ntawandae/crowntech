@@ -84,9 +84,19 @@ def create_app(config_object=None):
                 "whatsapp": app.config["BUSINESS_WHATSAPP"],
             },
             "cart_count": sum(int(q) for q in cart.values()),
+            "google_on": bool(app.config["GOOGLE_CLIENT_ID"] and app.config["GOOGLE_CLIENT_SECRET"]),
             "staff_pending_orders": pending,
             "current_year": datetime.utcnow().year,
         }
+
+    @app.before_request
+    def force_password_change():
+        """Staff whose password was set or reset by an admin must choose their own before doing anything else."""
+        from flask import redirect, request, url_for
+        if (current_user.is_authenticated and getattr(current_user, "must_change_password", False)
+                and request.endpoint not in ("auth.change_password_first", "auth.logout", "static")
+                and not request.path.startswith("/static/")):
+            return redirect(url_for("auth.change_password_first"))
 
     @app.before_request
     def block_public_contracts():

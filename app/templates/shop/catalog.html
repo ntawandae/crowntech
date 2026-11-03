@@ -1,55 +1,50 @@
 {% extends 'shop/base.html' %}
 {% from 'shop/_card.html' import product_card with context %}
-{% block title %}{{ category or 'All products' }} | {{ biz.name }}{% endblock %}
+{% block title %}{{ category or 'Shop' }} | {{ biz.name }}{% endblock %}
 {% block content %}
-<div class="wrap catalog-layout">
-  <aside aria-label="Categories">
-    <ul class="side-list">
-      <li><a href="{{ url_for('shop.catalog', q=q or None, sort=sort, all=1 if show_all else None) }}" {% if not category %}aria-current="true"{% endif %}>All <span>{{ categories|sum(attribute=1) }}</span></a></li>
-      {% for name, n, tone in categories %}
-      <li data-tone="{{ tone }}"><a href="{{ url_for('shop.catalog', q=q or None, category=name, sort=sort, all=1 if show_all else None) }}" {% if category == name %}aria-current="true"{% endif %}>{{ name }} <span>{{ n }}</span></a></li>
-      {% endfor %}
-    </ul>
-  </aside>
-  <section>
-    <div class="toolbar">
-      <div>
-        <h1 style="font-size:1.6rem;margin:0">{{ category or 'All products' }}</h1>
-        <div class="muted small">{{ total }} {{ 'result' if total == 1 else 'results' }}{% if q %} for &ldquo;{{ q }}&rdquo;{% endif %}</div>
-      </div>
-      <form method="get" class="actions">
-        {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
-        {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
-        <label for="sort" class="small" style="margin:0">Sort</label>
-        <select id="sort" name="sort" onchange="this.form.submit()">
-          <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest</option>
-          <option value="price_asc" {{ 'selected' if sort == 'price_asc' }}>Price, low to high</option>
-          <option value="price_desc" {{ 'selected' if sort == 'price_desc' }}>Price, high to low</option>
-        </select>
-        <label class="small" style="margin:0;display:flex;gap:6px;align-items:center;font-weight:500">
-          <input type="checkbox" name="all" value="1" style="width:auto" {{ 'checked' if show_all }} onchange="this.form.submit()"> Include out of stock
-        </label>
-        <noscript><button class="btn btn-sm" type="submit">Apply</button></noscript>
-      </form>
-    </div>
+<div class="wrap page" style="padding-top:22px">
+  <h1 style="font-size:2rem;margin-bottom:14px">{{ category or 'Shop' }}</h1>
 
-    {% if products %}
-      <div class="grid">{% for p in products %}{{ product_card(p) }}{% endfor %}</div>
-      {% if pages > 1 %}
-      <nav class="pager" aria-label="Pages">
-        {% for n in range(1, pages + 1) %}
-          {% if n == page %}<span class="cur" aria-current="page">{{ n }}</span>
-          {% else %}<a href="{{ url_for('shop.catalog', q=q or None, category=category or None, sort=sort, all=1 if show_all else None, page=n) }}">{{ n }}</a>{% endif %}
-        {% endfor %}
-      </nav>
-      {% endif %}
-    {% else %}
-      <div class="empty">
-        <h3>Nothing matches that search</h3>
-        <p class="muted">Try a shorter search, another category{% if not show_all %}, or include out-of-stock items{% endif %}.</p>
-        <a class="btn btn-ghost" href="{{ url_for('shop.catalog', all=1) }}">Show everything</a>
-      </div>
+  <form class="filterbar" method="get" role="search">
+    {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
+    {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+    <input type="search" name="q" value="{{ q }}" placeholder="Search by name or brand" aria-label="Search products">
+    <select name="sort" aria-label="Sort" onchange="this.form.submit()">
+      <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest</option>
+      <option value="price_asc" {{ 'selected' if sort == 'price_asc' }}>Price: low to high</option>
+      <option value="price_desc" {{ 'selected' if sort == 'price_desc' }}>Price: high to low</option>
+    </select>
+    <button class="btn" type="submit">Search</button>
+  </form>
+
+  <nav class="pills" aria-label="Categories">
+    <a class="pill {{ 'on' if not category }}" href="{{ url_for('shop.catalog', q=q or None, sort=sort, all=1 if show_all else None) }}">All</a>
+    {% for name, n, tone in categories %}
+      <a class="pill {{ 'on' if category == name }}" data-tone="{{ tone }}" href="{{ url_for('shop.catalog', q=q or None, category=name, sort=sort, all=1 if show_all else None) }}"><i></i>{{ name }}</a>
+    {% endfor %}
+    <span class="pill-gap"></span>
+    <a class="pill {{ 'on' if not show_all }}" href="{{ url_for('shop.catalog', q=q or None, category=category or None, sort=sort) }}">In stock</a>
+    <a class="pill {{ 'on' if show_all }}" href="{{ url_for('shop.catalog', q=q or None, category=category or None, sort=sort, all=1) }}">All items</a>
+  </nav>
+
+  <p class="muted small" style="margin:6px 0 16px">{{ total }} {{ 'result' if total == 1 else 'results' }}{% if q %} for &ldquo;{{ q }}&rdquo;{% endif %}</p>
+
+  {% if products %}
+    <div class="grid">{% for p in products %}{{ product_card(p) }}{% endfor %}</div>
+    {% if pages > 1 %}
+    <nav class="pager" aria-label="Pages">
+      {% for n in range(1, pages + 1) %}
+        {% if n == page %}<span class="cur" aria-current="page">{{ n }}</span>
+        {% else %}<a href="{{ url_for('shop.catalog', q=q or None, category=category or None, sort=sort, all=1 if show_all else None, page=n) }}">{{ n }}</a>{% endif %}
+      {% endfor %}
+    </nav>
     {% endif %}
-  </section>
+  {% else %}
+    <div class="empty">
+      <h3>Nothing matches that</h3>
+      <p class="muted">Try a shorter search, another category{% if not show_all %}, or include out-of-stock items{% endif %}.</p>
+      <a class="btn btn-ghost" href="{{ url_for('shop.catalog', all=1) }}">Show everything</a>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}
