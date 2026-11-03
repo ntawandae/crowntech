@@ -2,7 +2,7 @@
 {% block title %}Choose a new password | {{ biz.name }}{% endblock %}
 {% block content %}
 <div class="wrap"><div class="panel auth-card">
-  <h1 style="font-size:1.7rem">Choose a new password</h1>
+  <h1 style="font-size:1.4rem">Choose a new password</h1>
   <form method="post">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="field"><label for="password">New password</label><input id="password" type="password" name="password" autocomplete="new-password" minlength="8" required><div class="hint">At least 8 characters.</div></div>

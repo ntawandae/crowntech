@@ -5,7 +5,7 @@
 <div class="wrap page">
   <div class="section-head">
     <div>
-      <h1 style="font-size:2rem;margin-bottom:4px">Order {{ order.order_number }}</h1>
+      <h1 style="font-size:1.5rem;margin-bottom:4px">Order {{ order.order_number }}</h1>
       <span class="muted small">Placed {{ order.created_at|when }}</span>
     </div>
     <span class="badge {{ 'badge-ok' if order.status in ('paid','ready','completed') else ('badge-bad' if order.status == 'cancelled' else 'badge-warn') }}">{{ order.status_label }}</span>

@@ -64,28 +64,14 @@
     </div>
 
     <!-- Charts -->
-    <div class="grid-2">
-        <!-- Sales, Expenses & Income Chart -->
-        <div class="col-md-6">
-            <div class="card mb-4 h-100">
-                <div class="card-header">
-                    {{ 'Daily ' if range_type == 'monthly' else '' }}Sales, Expenses & Income Chart
-                </div>
-                <div class="card-body">
-                    <div style="height:280px"><canvas id="salesChart"></canvas></div>
-                </div>
-            </div>
+    <div class="chart-grid">
+        <div class="card chart-card">
+            <div class="card-header">{{ 'Daily ' if range_type == 'monthly' else '' }}Sales, expenses and income</div>
+            <div class="card-body"><div class="chart-box"><canvas id="salesChart"></canvas></div></div>
         </div>
-        <!-- Net Profit Chart -->
-        <div class="col-md-6">
-            <div class="card mb-4 h-100">
-                <div class="card-header">
-                    {{ 'Daily ' if range_type == 'monthly' else '' }}Net Profit Chart
-                </div>
-                <div class="card-body">
-                    <div style="height:280px"><canvas id="profitChart"></canvas></div>
-                </div>
-            </div>
+        <div class="card chart-card">
+            <div class="card-header">{{ 'Daily ' if range_type == 'monthly' else '' }}Net profit</div>
+            <div class="card-body"><div class="chart-box"><canvas id="profitChart"></canvas></div></div>
         </div>
     </div>
 
@@ -638,17 +624,18 @@ document.addEventListener('DOMContentLoaded', function() {
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'Sales', data: salesData, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 4, barPercentage: 0.6 },
-                    { label: 'Expenses', data: expensesData, backgroundColor: 'rgba(239, 68, 68, 0.8)', borderRadius: 4, barPercentage: 0.6 },
-                    { label: 'Extra Income', data: incomeData, backgroundColor: 'rgba(59, 130, 246, 0.8)', borderRadius: 4, barPercentage: 0.6 }
+                    { label: 'Sales', data: salesData, backgroundColor: '#17794a', borderRadius: 4, maxBarThickness: 34 },
+                    { label: 'Expenses', data: expensesData, backgroundColor: '#e0524a', borderRadius: 4, maxBarThickness: 34 },
+                    { label: 'Extra Income', data: incomeData, backgroundColor: '#0e9a8c', borderRadius: 4, maxBarThickness: 34 }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'top', labels: { font: { size: 12 } } } },
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 12 } } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': $' + Number(c.parsed.y).toFixed(2) } } },
                 scales: {
-                    y: { beginAtZero: true, title: { display: true, text: 'Amount ($)' } },
+                    y: { beginAtZero: true, ticks: { callback: v => '$' + v }, grid: { color: '#eef1f8' } },
                     x: { ticks: { font: { size: 12 } } }
                 }
             }
@@ -666,8 +653,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     label: 'Net Profit',
                     data: profitData,
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                    borderColor: '#2f5bea',
+                    backgroundColor: 'rgba(47, 91, 234, 0.12)',
                     fill: true,
                     tension: 0.3,
                     pointRadius: 3,
@@ -677,9 +664,10 @@ document.addEventListener('DOMContentLoaded', function() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'top', labels: { font: { size: 12 } } } },
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' Net profit: $' + Number(c.parsed.y).toFixed(2) } } },
                 scales: {
-                    y: { beginAtZero: true, title: { display: true, text: 'Net Profit ($)' } },
+                    y: { ticks: { callback: v => '$' + v }, grid: { color: '#eef1f8' } },
                     x: { ticks: { font: { size: 12 } } }
                 }
             }

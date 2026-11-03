@@ -74,7 +74,16 @@ def create_app(config_object=None):
         if current_user.is_authenticated and current_user.role in STAFF_ROLES:
             from .models import Order
             pending = Order.query.filter(Order.status.in_(["paid", "reserved"])).count()
+        nav_cats = []
+        try:
+            from flask import request as _rq
+            if _rq.blueprint == "shop":
+                from .views.shop import nav_categories
+                nav_cats = nav_categories()
+        except Exception:
+            nav_cats = []
         return {
+            "nav_categories": nav_cats,
             "csrf_token": csrf_token,
             "biz": {
                 "name": app.config["BUSINESS_NAME"],

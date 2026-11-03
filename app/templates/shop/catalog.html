@@ -3,7 +3,7 @@
 {% block title %}{{ category or 'Shop' }} | {{ biz.name }}{% endblock %}
 {% block content %}
 <div class="wrap page" style="padding-top:22px">
-  <h1 style="font-size:2rem;margin-bottom:14px">{{ category or 'Shop' }}</h1>
+  <h1 style="font-size:1.5rem;margin-bottom:14px">{{ category or 'Shop' }}</h1>
 
   <form class="filterbar" method="get" role="search">
     {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}

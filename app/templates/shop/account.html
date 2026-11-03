@@ -2,7 +2,7 @@
 {% block title %}My orders | {{ biz.name }}{% endblock %}
 {% block content %}
 <div class="wrap page">
-  <div class="section-head"><div><h1 style="font-size:2rem;margin-bottom:2px">My orders</h1><span class="muted">{{ current_user.full_name }} &middot; {{ current_user.username }}</span></div>
+  <div class="section-head"><div><h1 style="font-size:1.5rem;margin-bottom:2px">My orders</h1><span class="muted">{{ current_user.full_name }} &middot; {{ current_user.username }}</span></div>
   <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.logout') }}">Sign out</a></div>
   {% if orders %}
   <div class="table-wrap"><table class="tbl">

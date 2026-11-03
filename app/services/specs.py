@@ -31,6 +31,10 @@ CATEGORY_TONE = {
     "Accessories": "orange",
     "Other": "steel",
 }
+CATEGORY_ICON = {
+    "Laptops": "laptop", "Gaming laptops": "gamepad", "Phones": "phone",
+    "Monitors": "monitor", "Accessories": "headset", "Other": "box",
+}
 CATEGORY_ORDER = ["Laptops", "Gaming laptops", "Phones", "Monitors", "Accessories", "Other"]
 
 _CUT_MARKERS = re.compile(
@@ -59,7 +63,7 @@ def short_title(name, max_len=64):
         text = text[: match.start()].strip(" -|,;:")
     if len(text) > max_len:
         text = text[:max_len].rsplit(" ", 1)[0]
-    return text or clean_text(name)[:max_len]
+    return tidy_title(text or clean_text(name)[:max_len])
 
 
 def extract_specs(name):
@@ -117,3 +121,35 @@ def _ordinal(n):
     n = int(n)
     suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
+
+
+# ---- consistent capitalisation for storefront titles ("Hp probook 440 g7" -> "HP ProBook 440 G7")
+_ACRONYMS = {"hp", "pc", "ssd", "hdd", "usb", "hdmi", "lcd", "led", "rgb", "rtx", "gtx", "amd", "msi", "asus",
+             "lg", "tv", "ps5", "ps4", "ram", "cpu", "gpu", "uhd", "fhd", "qhd", "oled", "nfc", "vr", "ups"}
+_BRAND_CASE = {"iphone": "iPhone", "ipad": "iPad", "macbook": "MacBook", "airpods": "AirPods", "thinkpad": "ThinkPad",
+               "elitebook": "EliteBook", "probook": "ProBook", "zbook": "ZBook", "omen": "OMEN", "jbl": "JBL",
+               "oraimo": "Oraimo", "dell": "Dell", "lenovo": "Lenovo", "acer": "Acer", "apple": "Apple",
+               "samsung": "Samsung", "huawei": "Huawei", "xiaomi": "Xiaomi", "logitech": "Logitech",
+               "microsoft": "Microsoft", "sony": "Sony", "toshiba": "Toshiba", "tecno": "Tecno", "infinix": "Infinix"}
+_TOKEN = re.compile(r"^([^A-Za-z0-9]*)([A-Za-z0-9]+)([^A-Za-z0-9]*)$")
+
+
+def tidy_title(text):
+    out = []
+    for word in (text or "").split(" "):
+        m = _TOKEN.match(word)
+        if not m:
+            out.append(word)
+            continue
+        pre, core, post = m.groups()
+        low = core.lower()
+        if low in _ACRONYMS:
+            core = core.upper()
+        elif low in _BRAND_CASE:
+            core = _BRAND_CASE[low]
+        elif re.fullmatch(r"[a-z]\d{1,2}", core):          # model codes: g7, t14
+            core = core.upper()
+        elif core.isalpha() and (core.islower() or (core.isupper() and len(core) > 4)):
+            core = core.capitalize()
+        out.append(pre + core + post)
+    return " ".join(out)

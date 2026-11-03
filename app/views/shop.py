@@ -10,7 +10,8 @@ from flask import (Blueprint, abort, current_app, flash, redirect, render_templa
 from flask_login import current_user, login_required, login_user
 
 from .. import db
-from ..models import Order, Payment, Product, User
+from ..models import Order, Payment, Product, Sale, User
+from ..utils.timeutil import zim_now
 from ..security import (clear_failures, client_key, csrf_token, protect_blueprint, record_failure,
                         safe_next, throttled)
 from ..services import orders as order_svc
@@ -25,7 +26,7 @@ from ..services import tokens
 from ..services.google_auth import GoogleAuthError, build_auth_url, fetch_profile
 from ..services.mailer import abs_url, send_template
 from ..services.notify import notify_order
-from ..services.specs import CATEGORY_ORDER, CATEGORY_TONE, extract_specs, normalize_category, short_title, clean_text
+from ..services.specs import CATEGORY_ICON, CATEGORY_ORDER, CATEGORY_TONE, extract_specs, normalize_category, short_title, clean_text
 
 shop_bp = Blueprint("shop", __name__)
 protect_blueprint(shop_bp, exempt=("shop.paynow_result",))  # Paynow's server callback has no session
@@ -106,6 +107,42 @@ def visible_products():
     return Product.query.filter(Product.price > 0)
 
 
+def hot_products(limit=10, days=120):
+    """Best sellers over the last `days` (till + online), in stock only. Padded with the newest stock."""
+    since = zim_now() - timedelta(days=days)
+    rows = (db.session.query(Sale.product_id, db.func.sum(Sale.quantity))
+            .join(Product, Product.id == Sale.product_id)
+            .filter(Sale.timestamp >= since, Product.quantity > 0, Product.price > 0)
+            .group_by(Sale.product_id)
+            .order_by(db.func.sum(Sale.quantity).desc(), Sale.product_id)
+            .limit(limit).all())
+    ids = [r[0] for r in rows]
+    by_id = {p.id: p for p in Product.query.filter(Product.id.in_(ids or [0])).all()}
+    ordered = [by_id[i] for i in ids if i in by_id]
+    if len(ordered) < limit:
+        extra = (visible_products().filter(Product.quantity > 0, ~Product.id.in_(ids or [0]))
+                 .order_by(Product.date_added.desc()).limit(limit - len(ordered)).all())
+        ordered += extra
+    return ordered
+
+
+_nav_cache = {"t": 0.0, "v": []}
+
+
+def nav_categories():
+    """[(name, tone, icon)] for categories that have something in stock (cached for a minute)."""
+    if time.time() - _nav_cache["t"] < 60:
+        return _nav_cache["v"]
+    counts = {}
+    for (cat,) in db.session.query(Product.category).filter(Product.price > 0, Product.quantity > 0):
+        name = normalize_category(cat)
+        counts[name] = counts.get(name, 0) + 1
+    value = [(n, CATEGORY_TONE.get(n, "steel"), CATEGORY_ICON.get(n, "box"), counts[n])
+             for n in sorted(counts, key=category_rank)]
+    _nav_cache.update(t=time.time(), v=value)
+    return value
+
+
 def category_rank(label):
     return CATEGORY_ORDER.index(label) if label in CATEGORY_ORDER else len(CATEGORY_ORDER)
 
@@ -174,15 +211,12 @@ def order_url(order, **kw):
 @shop_bp.route("/")
 def home():
     sweep_expired()
-    rows = [present(p) for p in visible_products().filter(Product.quantity > 0).all()]
-    rows.sort(key=lambda r: (category_rank(r["category"]), -(r["added"].timestamp() if r["added"] else 0)))
-    featured = [r for r in rows if r["category"] in ("Laptops", "Gaming laptops", "Phones")][:8] or rows[:8]
-    counts = {}
-    for r in rows:
-        counts[r["category"]] = counts.get(r["category"], 0) + 1
-    categories = [(n, c, CATEGORY_TONE.get(n, "steel"))
-                  for n, c in sorted(counts.items(), key=lambda kv: category_rank(kv[0]))]
-    return render_template("shop/home.html", featured=featured, categories=categories, total=len(rows))
+    hot = [present(p) for p in hot_products(10)]
+    shown = {p["id"] for p in hot}
+    fresh = [present(p) for p in visible_products().filter(Product.quantity > 0)
+             .order_by(Product.date_added.desc()).limit(14).all() if p.id not in shown][:5]
+    total = visible_products().filter(Product.quantity > 0).count()
+    return render_template("shop/home.html", hot=hot, fresh=fresh, total=total)
 
 
 @shop_bp.route("/media/<size>/<path:filename>")

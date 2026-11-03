@@ -8,34 +8,58 @@
   <link rel="icon" href="{{ url_for('static', filename='images/cth_mark.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/shop.css') }}">
   {% block head %}{% endblock %}
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></symbol>
+  <symbol id="i-gamepad" viewBox="0 0 24 24"><path d="M6 12h4M8 10v4"/><circle cx="15" cy="11" r="1"/><circle cx="18" cy="13" r="1"/><path d="M17.3 5H6.7a4 4 0 0 0-3.9 3.2l-1.6 8A3 3 0 0 0 4 20c1 0 1.9-.5 2.5-1.3L8 17h8l1.5 1.7c.6.8 1.5 1.3 2.5 1.3a3 3 0 0 0 2.8-3.8l-1.6-8A4 4 0 0 0 17.3 5z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+  <symbol id="i-headset" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8z"/><path d="m3 8 9 5 9-5M12 13v8"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+</defs></svg>
 <a class="skip" href="#main">Skip to content</a>
+
 {% block header %}
+<div class="topbar"><div class="wrap">
+  <span class="tb-left">{% if biz.phone %}Call {{ biz.phone }}{% elif biz.whatsapp %}WhatsApp +{{ biz.whatsapp }}{% else %}{{ biz.name }}{% endif %}</span>
+  <span class="tb-mid">Pay with Paynow, PayPal or at the shop</span>
+  <span class="tb-right"><a href="{{ url_for('shop.track') }}">Track order</a>
+    {% if current_user.is_authenticated %}<a href="{{ url_for('shop.account') }}">{{ 'My orders' if current_user.role == 'customer' else 'Staff area' }}</a>{% else %}<a href="{{ url_for('shop.account_login') }}">Sign in</a>{% endif %}</span>
+</div></div>
+
 <header class="site-head">
   <div class="wrap head-row">
     <a class="brand" href="{{ url_for('shop.home') }}">
-      <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="42" height="42">
+      <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="40" height="40">
       <span>{{ biz.name }}</span>
     </a>
-    <nav class="head-nav" aria-label="Main">
-      <a href="{{ url_for('shop.catalog') }}" {% if request.endpoint in ('shop.catalog','shop.product') %}aria-current="page"{% endif %}>Shop</a>
-      <a class="hide-sm" href="{{ url_for('shop.track') }}">Track order</a>
+    <form class="head-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
+      <input type="search" name="q" value="{{ q|default('') }}" placeholder="Search laptops, phones, accessories" aria-label="Search products">
+      <button type="submit" aria-label="Search"><svg class="ic"><use href="#i-search"/></svg></button>
+    </form>
+    <nav class="head-nav" aria-label="Account and cart">
       {% if current_user.is_authenticated %}
-        {% if current_user.role == 'customer' %}
-          <a href="{{ url_for('shop.account') }}">My orders</a>
-        {% else %}
-          <a href="{{ url_for('shop.account') }}">Staff area</a>
-        {% endif %}
+        <a class="hn-link" href="{{ url_for('shop.account') }}"><svg class="ic"><use href="#i-user"/></svg><span class="hide-sm">{{ 'My orders' if current_user.role == 'customer' else 'Staff' }}</span></a>
       {% else %}
-        <a href="{{ url_for('shop.account_login') }}">Sign in</a>
+        <a class="hn-link" href="{{ url_for('shop.account_login') }}"><svg class="ic"><use href="#i-user"/></svg><span class="hide-sm">Sign in</span></a>
       {% endif %}
-      <a class="cart-link" href="{{ url_for('shop.cart') }}" {% if request.endpoint == 'shop.cart' %}aria-current="page"{% endif %}>Cart <span class="cart-count" aria-label="{{ cart_count }} items">{{ cart_count }}</span></a>
+      <a class="cart-link" href="{{ url_for('shop.cart') }}" aria-label="Cart, {{ cart_count }} items"><svg class="ic"><use href="#i-cart"/></svg><span class="hide-sm">Cart</span><span class="cart-count">{{ cart_count }}</span></a>
     </nav>
   </div>
+  <nav class="subnav" aria-label="Shop sections"><div class="wrap">
+    <a href="{{ url_for('shop.home') }}" {% if request.endpoint == 'shop.home' %}aria-current="page"{% endif %}>Home</a>
+    <a href="{{ url_for('shop.catalog') }}" {% if request.endpoint in ('shop.catalog','shop.product') and not request.args.get('category') %}aria-current="page"{% endif %}>All products</a>
+    {% for name, tone, icon, n in nav_categories %}
+      <a href="{{ url_for('shop.catalog', category=name) }}" {% if request.args.get('category') == name %}aria-current="page"{% endif %}>{{ name }}</a>
+    {% endfor %}
+  </div></nav>
 </header>
 {% endblock %}
 
@@ -72,7 +96,7 @@
       <p class="small"><a href="{{ url_for('auth.login') }}">Staff sign in</a></p>
     </div>
   </div>
-  <div class="wrap small" style="margin-top:22px;color:#8d98a3">&copy; {{ current_year }} {{ biz.name }}</div>
+  <div class="wrap small foot-copy">&copy; {{ current_year }} {{ biz.name }}</div>
 </footer>
 {% endblock %}
 </body>

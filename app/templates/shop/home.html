@@ -1,34 +1,74 @@
 {% extends 'shop/base.html' %}
 {% from 'shop/_card.html' import product_card with context %}
 {% block content %}
-<section class="hero">
-  <div class="wrap">
-    <h1>Laptops, phones and gadgets <em>you can trust.</em></h1>
-    <p>Browse what's in stock, pay online or at the shop, then collect or get it delivered.</p>
-    <div class="actions">
-      <a class="btn btn-gold" href="{{ url_for('shop.catalog') }}">Browse the shop</a>
-      {% if biz.whatsapp %}<a class="btn btn-light" href="https://wa.me/{{ biz.whatsapp }}">Chat on WhatsApp</a>{% endif %}
+<div class="wrap">
+  <section class="hero" aria-label="Welcome">
+    <div class="hero-copy">
+      <h1>Laptops, phones and gadgets you can trust.</h1>
+      <p class="lead">See what's in stock, pay online or at the shop, then collect your order or have it delivered.</p>
+      <div class="actions">
+        <a class="btn btn-gold" href="{{ url_for('shop.catalog') }}">Shop now</a>
+        {% if biz.whatsapp %}<a class="btn btn-light" href="https://wa.me/{{ biz.whatsapp }}">Chat on WhatsApp</a>{% endif %}
+      </div>
+      <ul class="hero-points">
+        <li>{{ total }} items in stock</li>
+        <li>Collect in store or delivery</li>
+        <li>Paynow &amp; PayPal accepted</li>
+      </ul>
     </div>
-  </div>
-</section>
+
+    {% if hot %}
+    <div class="spotlight" id="spotlight" role="region" aria-roledescription="carousel" aria-label="Hot selling items">
+      <div class="spot-head">
+        <span class="hot-tag">Hot selling</span>
+        <div class="dots" role="tablist" aria-label="Choose item">
+          {% for p in hot[:6] %}<button type="button" class="dot {{ 'on' if loop.first }}" aria-label="Show item {{ loop.index }}" data-i="{{ loop.index0 }}"></button>{% endfor %}
+        </div>
+      </div>
+      <div class="slides">
+        {% for p in hot[:6] %}
+        <a class="slide {{ 'on' if loop.first }}" data-tone="{{ p.tone }}" href="{{ url_for('shop.product', product_id=p.id) }}" {% if not loop.first %}tabindex="-1" aria-hidden="true"{% endif %}>
+          <span class="slide-media">{% if p.image %}<img src="{{ p.image }}" alt="" width="640" height="480">{% endif %}</span>
+          <span class="slide-info">
+            <span class="slide-cat">{{ p.category }}</span>
+            <strong class="slide-title">{{ p.title }}</strong>
+            <span class="slide-specs">{{ p.specs[:3]|join(' · ') }}</span>
+            <span class="slide-price">{{ p.price|money }}</span>
+            <span class="btn btn-gold btn-sm">View item</span>
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  <nav class="cat-row" aria-label="Browse by category">
+    {% for name, tone, icon, n in nav_categories %}
+    <a class="cat-tile" data-tone="{{ tone }}" href="{{ url_for('shop.catalog', category=name) }}">
+      <span class="cat-ic"><svg class="ic"><use href="#i-{{ icon }}"/></svg></span>
+      <strong>{{ name }}</strong><small>{{ n }} in stock</small>
+    </a>
+    {% endfor %}
+  </nav>
+</div>
 
 <section class="section">
   <div class="wrap">
-    <div class="section-head">
-      <h2>Available now</h2>
-      <a href="{{ url_for('shop.catalog') }}">View all {{ total }}</a>
-    </div>
-    <nav class="pills" aria-label="Categories">
-      {% for name, n, tone in categories %}<a class="pill" data-tone="{{ tone }}" href="{{ url_for('shop.catalog', category=name) }}"><i></i>{{ name }}</a>{% endfor %}
-    </nav>
-    {% if featured %}
-      <div class="grid">{% for p in featured %}{{ product_card(p) }}{% endfor %}</div>
-      <p style="text-align:center;margin:28px 0 0"><a class="btn btn-ghost" href="{{ url_for('shop.catalog') }}">See everything in stock</a></p>
-    {% else %}
-      <div class="empty"><h3>New stock is on its way</h3><p class="muted">Check back soon{% if biz.whatsapp %} or <a href="https://wa.me/{{ biz.whatsapp }}">message us on WhatsApp</a>{% endif %}.</p></div>
-    {% endif %}
+    <div class="section-head"><h2>Popular products</h2><a href="{{ url_for('shop.catalog') }}">View all</a></div>
+    {% if hot %}<div class="grid">{% for p in hot %}{{ product_card(p) }}{% endfor %}</div>
+    {% else %}<div class="empty"><h3>New stock is on its way</h3><p class="muted">Check back soon{% if biz.whatsapp %} or <a href="https://wa.me/{{ biz.whatsapp }}">message us on WhatsApp</a>{% endif %}.</p></div>{% endif %}
   </div>
 </section>
+
+{% if fresh %}
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head"><h2>New arrivals</h2><a href="{{ url_for('shop.catalog', sort='newest') }}">View all</a></div>
+    <div class="grid">{% for p in fresh %}{{ product_card(p) }}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
 
 <section class="band">
   <div class="wrap">
@@ -36,4 +76,26 @@
     {% if biz.whatsapp %}<a class="btn btn-gold" href="https://wa.me/{{ biz.whatsapp }}?text={{ 'Hi, I am looking for...'|urlencode }}">Ask on WhatsApp</a>{% elif biz.phone %}<a class="btn btn-gold" href="tel:{{ biz.phone }}">Call {{ biz.phone }}</a>{% else %}<a class="btn btn-gold" href="{{ url_for('shop.track') }}">Track an order</a>{% endif %}
   </div>
 </section>
+
+<script>
+/* Hot-selling spotlight: changes every few seconds, pauses on hover/focus, and stays still for reduced-motion users. */
+(function () {
+  const box = document.getElementById('spotlight'); if (!box) return;
+  const slides = [...box.querySelectorAll('.slide')], dots = [...box.querySelectorAll('.dot')];
+  if (slides.length < 2) { dots.forEach(d => d.hidden = true); return; }
+  let i = 0, timer = null;
+  const show = n => {
+    i = (n + slides.length) % slides.length;
+    slides.forEach((s, k) => { s.classList.toggle('on', k === i); s.setAttribute('aria-hidden', k === i ? 'false' : 'true'); s.tabIndex = k === i ? 0 : -1; });
+    dots.forEach((d, k) => d.classList.toggle('on', k === i));
+  };
+  const start = () => { if (!matchMedia('(prefers-reduced-motion: reduce)').matches) timer = setInterval(() => show(i + 1), 4500); };
+  const stop = () => { clearInterval(timer); timer = null; };
+  dots.forEach(d => d.addEventListener('click', () => { stop(); show(+d.dataset.i); start(); }));
+  box.addEventListener('mouseenter', stop); box.addEventListener('mouseleave', () => { stop(); start(); });
+  box.addEventListener('focusin', stop); box.addEventListener('focusout', () => { stop(); start(); });
+  document.addEventListener('visibilitychange', () => document.hidden ? stop() : (stop(), start()));
+  start();
+})();
+</script>
 {% endblock %}

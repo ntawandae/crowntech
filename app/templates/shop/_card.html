@@ -2,18 +2,18 @@
 <article class="card {{ 'is-out' if not p.in_stock }}" data-tone="{{ p.tone }}">
   <a class="card-media" href="{{ url_for('shop.product', product_id=p.id) }}" tabindex="-1" aria-hidden="true">
     {% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy" width="640" height="480">{% else %}<span class="noimg">{{ p.category }}</span>{% endif %}
-    {% if not p.in_stock %}<span class="cat-tag out">Out of stock</span>{% elif p.low_stock %}<span class="cat-tag low">Only {{ p.qty }} left</span>{% endif %}
+    {% if not p.in_stock %}<span class="cat-tag out">Out of stock</span>{% elif p.low_stock %}<span class="cat-tag low">{{ p.qty }} left</span>{% endif %}
   </a>
   <div class="card-body">
-    <div class="card-cat"><i></i>{{ p.category }}</div>
     <h3 class="card-title"><a href="{{ url_for('shop.product', product_id=p.id) }}">{{ p.title }}</a></h3>
+    <div class="card-meta">{{ p.specs[:2]|join(' · ') if p.specs else p.category }}</div>
     <div class="card-foot">
       <div class="price">{{ p.price|money }}</div>
       {% if p.in_stock %}
       <form method="post" action="{{ url_for('shop.cart_add', product_id=p.id) }}">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
-        <button class="btn btn-gold btn-sm" type="submit">Add to cart</button>
+        <button class="btn btn-gold btn-sm" type="submit">Add</button>
       </form>
       {% else %}<a class="btn btn-ghost btn-sm" href="{{ url_for('shop.product', product_id=p.id) }}">View</a>{% endif %}
     </div>
