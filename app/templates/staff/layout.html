@@ -32,43 +32,44 @@
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
 </defs></svg>
 
-{% set is_admin = current_user.role == 'admin' %}
-{% set ep = request.endpoint or '' %}
-{% set view = request.args.get('view') or request.form.get('view') or '' %}
+{% set nav_admin = current_user.role == 'admin' %}
+{% set nav_ep = request.endpoint or '' %}
+{% set nav_view = request.args.get('view') or request.form.get('view') or '' %}
 {% macro item(href, icon, label, active, badge=0) %}
   <a href="{{ href }}" class="{{ 'active' if active }}"><svg class="i"><use href="#i-{{ icon }}"/></svg>{{ label }}{% if badge %}<span class="count">{{ badge }}</span>{% endif %}</a>
 {% endmacro %}
 
 <aside class="sidebar" id="sidebar" aria-label="Main navigation">
-  <a class="side-brand" href="{{ url_for('admin.admin_dashboard') if is_admin else url_for('cashier.cashier_dashboard') }}">
+  <a class="side-brand" href="{{ url_for('admin.admin_dashboard') if nav_admin else url_for('cashier.cashier_dashboard') }}">
     <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="">
-    <span><strong>{{ biz.name }}</strong><small>{{ 'ADMIN' if is_admin else 'CASHIER' }}</small></span>
+    <span><strong>{{ biz.name }}</strong><small>{{ 'ADMIN' if nav_admin else 'CASHIER' }}</small></span>
   </a>
   <nav class="side-nav">
-  {% if is_admin %}
+  {% if nav_admin %}
     <div class="side-group">Overview</div>
-    {{ item(url_for('admin.admin_dashboard', view='overview'), 'grid', 'Dashboard', ep == 'admin.admin_dashboard' and view in ('', 'overview', 'dashboard')) }}
+    {{ item(url_for('admin.admin_dashboard', view='overview'), 'grid', 'Dashboard', nav_ep == 'admin.admin_dashboard' and nav_view in ('', 'overview', 'dashboard')) }}
     <div class="side-group">Selling</div>
-    {{ item(url_for('admin.view_sales'), 'receipt', 'Sales records', ep == 'admin.view_sales') }}
-    {{ item(url_for('admin.quotations'), 'file', 'Quotations', ep in ('admin.quotations', 'admin.edit_quotation')) }}
-    {{ item(url_for('staff_orders.order_list'), 'bag', 'Online orders', ep.startswith('staff_orders.'), staff_pending_orders) }}
+    {{ item(url_for('admin.view_sales'), 'receipt', 'Sales records', nav_ep == 'admin.view_sales') }}
+    {{ item(url_for('admin.quotations'), 'file', 'Quotations', nav_ep in ('admin.quotations', 'admin.edit_quotation')) }}
+    {{ item(url_for('staff_orders.order_list'), 'bag', 'Online orders', nav_ep.startswith('staff_orders.'), staff_pending_orders) }}
     <div class="side-group">Stock</div>
-    {{ item(url_for('admin.admin_dashboard', view='products'), 'box', 'Products', ep == 'admin.admin_dashboard' and view == 'products') }}
-    {{ item(url_for('admin.admin_dashboard', view='stock'), 'plus', 'Add stock', ep == 'admin.admin_dashboard' and view == 'stock') }}
-    {{ item(url_for('admin.admin_dashboard', view='requests'), 'inbox', 'Requests', ep == 'admin.admin_dashboard' and view in ('requests', 'defects')) }}
+    {{ item(url_for('admin.admin_dashboard', view='products'), 'box', 'Products', nav_ep == 'admin.admin_dashboard' and nav_view == 'products') }}
+    {{ item(url_for('admin.admin_dashboard', view='stock'), 'plus', 'Add stock', nav_ep == 'admin.admin_dashboard' and nav_view == 'stock') }}
+    {{ item(url_for('admin.admin_dashboard', view='requests'), 'inbox', 'Requests', nav_ep == 'admin.admin_dashboard' and nav_view in ('requests', 'defects')) }}
     <div class="side-group">Money &amp; people</div>
-    {{ item(url_for('admin.admin_dashboard', view='expenses'), 'wallet', 'Expenses', ep == 'admin.admin_dashboard' and view == 'expenses') }}
-    {{ item(url_for('admin.users'), 'users', 'Users', ep == 'admin.users') }}
+    {{ item(url_for('admin.admin_dashboard', view='expenses'), 'wallet', 'Expenses', nav_ep == 'admin.admin_dashboard' and nav_view == 'expenses') }}
+    {{ item(url_for('admin.users'), 'users', 'Users', nav_ep == 'admin.users') }}
+    {{ item(url_for('admin.email_setup'), 'inbox', 'Email setup', nav_ep == 'admin.email_setup') }}
   {% else %}
     <div class="side-group">Till</div>
-    {{ item(url_for('cashier.cashier_dashboard'), 'till', 'Point of sale', ep == 'cashier.cashier_dashboard') }}
-    {{ item(url_for('cashier.inventory'), 'clip', 'Inventory', ep == 'cashier.inventory') }}
+    {{ item(url_for('cashier.cashier_dashboard'), 'till', 'Point of sale', nav_ep == 'cashier.cashier_dashboard') }}
+    {{ item(url_for('cashier.inventory'), 'clip', 'Inventory', nav_ep == 'cashier.inventory') }}
     <div class="side-group">Selling</div>
-    {{ item(url_for('cashier.quotations'), 'file', 'Quotations', ep in ('cashier.quotations', 'cashier.edit_quotation')) }}
-    {{ item(url_for('staff_orders.order_list'), 'bag', 'Online orders', ep.startswith('staff_orders.'), staff_pending_orders) }}
+    {{ item(url_for('cashier.quotations'), 'file', 'Quotations', nav_ep in ('cashier.quotations', 'cashier.edit_quotation')) }}
+    {{ item(url_for('staff_orders.order_list'), 'bag', 'Online orders', nav_ep.startswith('staff_orders.'), staff_pending_orders) }}
     <div class="side-group">Records</div>
-    {{ item(url_for('cashier.daily_report'), 'chart', 'Daily report', ep == 'cashier.daily_report') }}
-    {{ item(url_for('cashier.my_requests'), 'inbox', 'My requests', ep == 'cashier.my_requests') }}
+    {{ item(url_for('cashier.daily_report'), 'chart', 'Daily report', nav_ep == 'cashier.daily_report') }}
+    {{ item(url_for('cashier.my_requests'), 'inbox', 'My requests', nav_ep == 'cashier.my_requests') }}
   {% endif %}
   </nav>
   <div class="side-foot">
@@ -98,16 +99,16 @@
   </main>
 </div>
 <nav class="tabbar" aria-label="Quick links">
-{% if is_admin %}
-  <a href="{{ url_for('admin.admin_dashboard', view='overview') }}" class="{{ 'active' if ep == 'admin.admin_dashboard' and view in ('', 'overview', 'dashboard') }}"><svg class="i"><use href="#i-grid"/></svg>Home</a>
-  <a href="{{ url_for('admin.view_sales') }}" class="{{ 'active' if ep == 'admin.view_sales' }}"><svg class="i"><use href="#i-receipt"/></svg>Sales</a>
-  <a href="{{ url_for('staff_orders.order_list') }}" class="{{ 'active' if ep.startswith('staff_orders.') }}"><svg class="i"><use href="#i-bag"/></svg>Orders{% if staff_pending_orders %}<span class="count">{{ staff_pending_orders }}</span>{% endif %}</a>
-  <a href="{{ url_for('admin.admin_dashboard', view='products') }}" class="{{ 'active' if ep == 'admin.admin_dashboard' and view == 'products' }}"><svg class="i"><use href="#i-box"/></svg>Products</a>
+{% if nav_admin %}
+  <a href="{{ url_for('admin.admin_dashboard', view='overview') }}" class="{{ 'active' if nav_ep == 'admin.admin_dashboard' and nav_view in ('', 'overview', 'dashboard') }}"><svg class="i"><use href="#i-grid"/></svg>Home</a>
+  <a href="{{ url_for('admin.view_sales') }}" class="{{ 'active' if nav_ep == 'admin.view_sales' }}"><svg class="i"><use href="#i-receipt"/></svg>Sales</a>
+  <a href="{{ url_for('staff_orders.order_list') }}" class="{{ 'active' if nav_ep.startswith('staff_orders.') }}"><svg class="i"><use href="#i-bag"/></svg>Orders{% if staff_pending_orders %}<span class="count">{{ staff_pending_orders }}</span>{% endif %}</a>
+  <a href="{{ url_for('admin.admin_dashboard', view='products') }}" class="{{ 'active' if nav_ep == 'admin.admin_dashboard' and nav_view == 'products' }}"><svg class="i"><use href="#i-box"/></svg>Products</a>
 {% else %}
-  <a href="{{ url_for('cashier.cashier_dashboard') }}" class="{{ 'active' if ep == 'cashier.cashier_dashboard' }}"><svg class="i"><use href="#i-till"/></svg>Till</a>
-  <a href="{{ url_for('cashier.quotations') }}" class="{{ 'active' if ep in ('cashier.quotations', 'cashier.edit_quotation') }}"><svg class="i"><use href="#i-file"/></svg>Quotes</a>
-  <a href="{{ url_for('staff_orders.order_list') }}" class="{{ 'active' if ep.startswith('staff_orders.') }}"><svg class="i"><use href="#i-bag"/></svg>Orders{% if staff_pending_orders %}<span class="count">{{ staff_pending_orders }}</span>{% endif %}</a>
-  <a href="{{ url_for('cashier.daily_report') }}" class="{{ 'active' if ep == 'cashier.daily_report' }}"><svg class="i"><use href="#i-chart"/></svg>Report</a>
+  <a href="{{ url_for('cashier.cashier_dashboard') }}" class="{{ 'active' if nav_ep == 'cashier.cashier_dashboard' }}"><svg class="i"><use href="#i-till"/></svg>Till</a>
+  <a href="{{ url_for('cashier.quotations') }}" class="{{ 'active' if nav_ep in ('cashier.quotations', 'cashier.edit_quotation') }}"><svg class="i"><use href="#i-file"/></svg>Quotes</a>
+  <a href="{{ url_for('staff_orders.order_list') }}" class="{{ 'active' if nav_ep.startswith('staff_orders.') }}"><svg class="i"><use href="#i-bag"/></svg>Orders{% if staff_pending_orders %}<span class="count">{{ staff_pending_orders }}</span>{% endif %}</a>
+  <a href="{{ url_for('cashier.daily_report') }}" class="{{ 'active' if nav_ep == 'cashier.daily_report' }}"><svg class="i"><use href="#i-chart"/></svg>Report</a>
 {% endif %}
   <button type="button" onclick="document.body.classList.toggle('nav-open')" aria-label="More"><svg class="i"><use href="#i-menu"/></svg>More</button>
 </nav>
