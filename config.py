@@ -98,6 +98,9 @@ class Config:
     # --- Sign in with Google (customers only) ----------------------------------------
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    # Full https callback URL, exactly as listed in Google Cloud Console, e.g.
+    # https://www.crowntechhub.co.zw/account/google/callback
+    GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "").strip()
 
     # --- Paynow ----------------------------------------------------------
     PAYNOW_INTEGRATION_ID = os.environ.get("PAYNOW_INTEGRATION_ID", "")

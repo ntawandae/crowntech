@@ -93,7 +93,8 @@ def create_app(config_object=None):
                 "whatsapp": app.config["BUSINESS_WHATSAPP"],
             },
             "cart_count": sum(int(q) for q in cart.values()),
-            "google_on": bool(app.config["GOOGLE_CLIENT_ID"] and app.config["GOOGLE_CLIENT_SECRET"]),
+            "google_on": bool(app.config["GOOGLE_CLIENT_ID"] and app.config["GOOGLE_CLIENT_SECRET"]
+                          and app.config["GOOGLE_REDIRECT_URI"]),
             "staff_pending_orders": pending,
             "current_year": datetime.utcnow().year,
         }
