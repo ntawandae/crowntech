@@ -1142,7 +1142,8 @@ def email_setup():
     """Shows how email is configured and sends a real test message, reporting the exact result."""
     import os
     from ..security import client_key, record_failure, throttled
-    from ..services.mailer import send_email_sync
+    from ..services.aliyun_dm import REGIONS
+    from ..services.mailer import backend_name, send_email_sync
 
     cfg = current_app.config
     if request.method == 'POST':
@@ -1161,20 +1162,39 @@ def email_setup():
 
     on_render = os.environ.get('RENDER', '').lower() == 'true'
     behind_proxy = os.environ.get('BEHIND_PROXY', '').lower() in ('1', 'true', 'yes')
-    if cfg['MAIL_USE_SSL']:
-        encryption = 'SSL from the start (port 465 style)'
-    elif cfg['MAIL_USE_TLS']:
-        encryption = 'STARTTLS'
-    else:
-        encryption = 'None'
+    backend = backend_name(cfg)
     warnings = []
-    if not cfg['MAIL_SERVER']:
-        warnings.append("MAIL_SERVER is empty: emails are NOT being sent (they are saved in instance/outbox/ for testing).")
-    if on_render and cfg['MAIL_SERVER'] and cfg['MAIL_PORT'] in (25, 465, 587):
-        warnings.append("Render's free plan blocks outbound ports 25, 465 and 587. If the test times out, use port 80 "
-                        "with MAIL_USE_TLS=true and MAIL_USE_SSL=false, or upgrade the Render instance.")
-    if cfg['MAIL_SERVER'] and not cfg['MAIL_PASSWORD']:
-        warnings.append("MAIL_PASSWORD is empty. Set it to the SMTP password created for the sender address.")
+    key_id = cfg['ALIYUN_DM_ACCESS_KEY_ID']
+    if backend == 'aliyun_api':
+        host, region_id = REGIONS.get(cfg['ALIYUN_DM_REGION'], (None, None))
+        status = [
+            ("Mode", "Alibaba Direct Mail (HTTPS API)"),
+            ("Region", f"{cfg['ALIYUN_DM_REGION']} ({cfg['ALIYUN_DM_ENDPOINT'] or host or 'unknown region'})"),
+            ("AccessKey ID", (key_id[:4] + '...' + key_id[-3:]) if len(key_id) > 8 else 'set'),
+            ("AccessKey Secret", "set" if cfg['ALIYUN_DM_ACCESS_KEY_SECRET'] else "NOT SET"),
+            ("Sent from", f"{cfg['MAIL_FROM_NAME']} <{cfg['MAIL_FROM']}>"),
+        ]
+        if not cfg['ALIYUN_DM_ACCESS_KEY_SECRET']:
+            warnings.append("ALIYUN_DM_ACCESS_KEY_SECRET is empty. Set it to the secret of the AccessKey above.")
+        if host is None and not cfg['ALIYUN_DM_ENDPOINT']:
+            warnings.append("ALIYUN_DM_REGION must be hangzhou, singapore or sydney (the region where the sender address was created).")
+    elif backend == 'smtp':
+        encryption = 'SSL from the start' if cfg['MAIL_USE_SSL'] else ('STARTTLS' if cfg['MAIL_USE_TLS'] else 'None')
+        status = [
+            ("Mode", "SMTP"),
+            ("Server", f"{cfg['MAIL_SERVER']}:{cfg['MAIL_PORT']}"),
+            ("Encryption", encryption),
+            ("Login", cfg['MAIL_USERNAME'] or '-'),
+            ("Password", "set" if cfg['MAIL_PASSWORD'] else "NOT SET"),
+            ("Sent from", f"{cfg['MAIL_FROM_NAME']} <{cfg['MAIL_FROM']}>"),
+        ]
+        if on_render and cfg['MAIL_PORT'] in (25, 465, 587):
+            warnings.append("Render's free plan blocks outbound ports 25, 465 and 587. Use the Direct Mail API instead "
+                            "(ALIYUN_DM_ACCESS_KEY_ID / SECRET), or SMTP on port 80 with MAIL_USE_TLS=true.")
+    else:
+        status = [("Mode", "Development: emails are only saved in instance/outbox/")]
+        warnings.append("No email service is configured: customers will NOT receive verification, reset or order emails. "
+                        "Set ALIYUN_DM_ACCESS_KEY_ID and ALIYUN_DM_ACCESS_KEY_SECRET (or the MAIL_* SMTP settings).")
     if not cfg['PUBLIC_BASE_URL']:
         warnings.append("PUBLIC_BASE_URL is not set. Links in emails will use whatever address the request arrived on. "
                         "Set it to your site address, e.g. https://crowntechhub.co.zw")
@@ -1183,15 +1203,11 @@ def email_setup():
     if on_render and not behind_proxy:
         warnings.append("BEHIND_PROXY is not set to true. On Render, every visitor then looks like the same address, so "
                         "login limits are shared by everyone and some links may use http. Set BEHIND_PROXY=true.")
-    status = [
-        ("Mode", "Sending through SMTP" if cfg['MAIL_SERVER'] else "Development: saved to instance/outbox/ only"),
-        ("Server", f"{cfg['MAIL_SERVER'] or '-'}:{cfg['MAIL_PORT']}"),
-        ("Encryption", encryption),
-        ("Login", cfg['MAIL_USERNAME'] or '-'),
-        ("Password", "set" if cfg['MAIL_PASSWORD'] else "not set"),
-        ("Sent from", f"{cfg['MAIL_FROM_NAME']} <{cfg['MAIL_FROM']}>"),
+    status += [
         ("Site address", cfg['PUBLIC_BASE_URL'] or "not set"),
         ("Google sign-in", "configured" if cfg['GOOGLE_CLIENT_ID'] and cfg['GOOGLE_CLIENT_SECRET'] else "not configured"),
+        ("PayPal", f"configured ({cfg['PAYPAL_MODE']})" if cfg['PAYPAL_CLIENT_ID'] and cfg['PAYPAL_CLIENT_SECRET'] else "not configured"),
+        ("Paynow", "configured" if cfg['PAYNOW_INTEGRATION_ID'] and cfg['PAYNOW_INTEGRATION_KEY'] else "not configured"),
     ]
     return render_template('admin_email_setup.html', status=status, warnings=warnings,
                            default_to=current_user.username)

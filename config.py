@@ -83,6 +83,12 @@ class Config:
     MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", False)       # STARTTLS (e.g. port 80/25/587), when SSL is off
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")   # the sender address you created in Direct Mail
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")   # the SMTP password set in the Direct Mail console
+    # Preferred on Render: send through the Direct Mail HTTPS API (no SMTP ports needed). Used when the key id is set.
+    ALIYUN_DM_ACCESS_KEY_ID = os.environ.get("ALIYUN_DM_ACCESS_KEY_ID", "")
+    ALIYUN_DM_ACCESS_KEY_SECRET = os.environ.get("ALIYUN_DM_ACCESS_KEY_SECRET", "")
+    ALIYUN_DM_REGION = os.environ.get("ALIYUN_DM_REGION", "singapore").strip().lower()   # hangzhou / singapore / sydney
+    ALIYUN_DM_ENDPOINT = os.environ.get("ALIYUN_DM_ENDPOINT", "").strip()                 # optional override
+    ALIYUN_DM_REPLY_TO = _env_bool("ALIYUN_DM_REPLY_TO", False)  # true only if a reply-to address is verified in the console
     MAIL_TIMEOUT = int(os.environ.get("MAIL_TIMEOUT", "20"))
     MAIL_FROM = os.environ.get("MAIL_FROM", "info@crowntechhub.co.zw")
     MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", os.environ.get("BUSINESS_NAME", "Crown Tech Hub"))

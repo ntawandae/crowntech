@@ -35,6 +35,24 @@ def build_message(cfg, to, subject, text, html=None):
     return msg
 
 
+def backend_name(cfg):
+    """aliyun_api (HTTPS, preferred) > smtp > console (development)."""
+    if cfg.get("ALIYUN_DM_ACCESS_KEY_ID"):
+        return "aliyun_api"
+    if cfg.get("MAIL_SERVER"):
+        return "smtp"
+    return "console"
+
+
+def _deliver_aliyun(cfg, to, subject, text, html):
+    from . import aliyun_dm
+    return aliyun_dm.send_single(
+        cfg["ALIYUN_DM_ACCESS_KEY_ID"], cfg["ALIYUN_DM_ACCESS_KEY_SECRET"], cfg["ALIYUN_DM_REGION"],
+        _clean_header(cfg["MAIL_FROM"]), _clean_header(to), _clean_header(subject), html=html, text=text,
+        from_alias=_clean_header(cfg["MAIL_FROM_NAME"]), reply_to=cfg.get("ALIYUN_DM_REPLY_TO", False),
+        timeout=cfg.get("MAIL_TIMEOUT", 20), endpoint=cfg.get("ALIYUN_DM_ENDPOINT") or None)
+
+
 def _tls_contexts():
     """Normal TLS first; if the handshake fails, retry with the library's broader cipher list
     (Alibaba's docs note some Python builds need this to talk to Direct Mail)."""
@@ -79,6 +97,25 @@ def _deliver_smtp(cfg, msg):
 def friendly_smtp_error(exc, cfg):
     """Turn a mail failure into something an admin can act on."""
     host, port = cfg.get("MAIL_SERVER"), cfg.get("MAIL_PORT")
+    if type(exc).__name__ == "AliyunDMError":
+        code, detail = getattr(exc, "code", "") or "", getattr(exc, "message", "") or ""
+        if code == "ConnectionError":
+            return f"Could not reach Alibaba Direct Mail ({detail}). Check the region setting and that the site has internet access."
+        if "InvalidAccessKeyId" in code:
+            return "Alibaba does not recognise the AccessKey ID. Re-copy ALIYUN_DM_ACCESS_KEY_ID with no spaces."
+        if code.startswith("SignatureDoesNotMatch"):
+            return "The AccessKey Secret does not match the AccessKey ID. Re-copy ALIYUN_DM_ACCESS_KEY_SECRET with no spaces."
+        if "Timestamp" in code or "TimeStamp" in code:
+            return "Alibaba rejected the request time. The server clock may be wrong; try again in a minute."
+        if "InvalidMailAddress" in code or "SenderAddress" in code:
+            return ("Alibaba says the sender address is not valid for this region. MAIL_FROM must be a sender address created "
+                    "in the Direct Mail console under the same region as ALIYUN_DM_REGION.")
+        if code.startswith("Forbidden") or "NoPermission" in code or "NotAuthorized" in code:
+            return ("The AccessKey is not allowed to send mail. Give its RAM user permission for dm:SingleSendMail "
+                    "(for example the AliyunDirectMailFullAccess policy).")
+        if "Quota" in code or "Throttling" in code:
+            return f"Alibaba is limiting sending right now ({code}). Check the daily quota in the Direct Mail console."
+        return f"Alibaba Direct Mail replied: {code}{(' - ' + detail) if detail else ''}"
     if isinstance(exc, smtplib.SMTPAuthenticationError):
         return ("The mail server rejected the login. The username must be the full sender address "
                 f"({cfg.get('MAIL_USERNAME') or 'not set'}) and the password must be the SMTP password set for that "
@@ -124,7 +161,10 @@ def send_email(to, subject, text, html=None):
 
     def job():
         try:
-            if cfg["MAIL_SERVER"]:
+            backend = backend_name(cfg)
+            if backend == "aliyun_api":
+                _deliver_aliyun(cfg, to, subject, text, html)
+            elif backend == "smtp":
                 _deliver_smtp(cfg, msg)
             else:
                 _deliver_console(app.instance_path, msg)
@@ -158,13 +198,17 @@ def send_email_sync(to, subject, text, html=None):
     cfg = dict(current_app.config)
     if not to or "@" not in to:
         return False, "Enter a valid email address."
-    msg = build_message(cfg, to, subject, text, html)
-    if not cfg["MAIL_SERVER"]:
+    backend = backend_name(cfg)
+    if backend == "console":
+        msg = build_message(cfg, to, subject, text, html)
         _deliver_console(current_app.instance_path, msg)
-        return True, "MAIL_SERVER is empty, so nothing was sent. The email was saved in instance/outbox/ instead."
+        return True, "No email service is configured, so nothing was sent. A copy was saved in instance/outbox/ instead."
     try:
-        _deliver_smtp(cfg, msg)
+        if backend == "aliyun_api":
+            _deliver_aliyun(cfg, to, subject, text, html)
+        else:
+            _deliver_smtp(cfg, build_message(cfg, to, subject, text, html))
     except Exception as exc:
         log.warning("Test email failed: %s", exc)
         return False, friendly_smtp_error(exc, cfg)
-    return True, f"Sent to {to}. Check the inbox (and the spam folder)."
+    return True, f"Sent to {to} through {'Alibaba Direct Mail (API)' if backend == 'aliyun_api' else 'SMTP'}. Check the inbox and the spam folder."
