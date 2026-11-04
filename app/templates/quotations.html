@@ -1,14 +1,14 @@
 {% extends "staff/layout.html" %}
-{% set ep = 'admin' if current_user.role == 'admin' else 'cashier' %}
+{% set side = 'admin' if current_user.role == 'admin' else 'cashier' %}
 {% block title %}Quotations{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><h1>{{ 'Edit quotation ' ~ edit_number if edit else 'Quotations' }}</h1>
   <p>{{ 'Change the items or discount, then save.' if edit else 'Prepare a price quote, then convert it to a sale when the customer agrees.' }}</p></div>
-  {% if edit %}<a class="btn btn-ghost" href="{{ url_for(ep ~ '.quotations') }}">Back to all quotations</a>{% endif %}
+  {% if edit %}<a class="btn btn-ghost" href="{{ url_for(side ~ '.quotations') }}">Back to all quotations</a>{% endif %}
 </div>
 
-<form method="POST" id="quoteForm" class="card" action="{{ url_for(ep ~ '.edit_quotation', quotation_id=edit_id) if edit else url_for(ep ~ '.quotations') }}">
+<form method="POST" id="quoteForm" class="card" action="{{ url_for(side ~ '.edit_quotation', quotation_id=edit_id) if edit else url_for(side ~ '.quotations') }}">
   <div class="card-header">{{ 'Quotation details' if edit else 'New quotation' }}</div>
   <div class="card-body">
     <label for="customer_name">Customer name</label>
@@ -46,25 +46,25 @@
 
 {% if not edit %}
 <div class="card">
-  <div class="card-header">{{ 'All quotations' if ep == 'admin' else 'My quotations' }}</div>
+  <div class="card-header">{{ 'All quotations' if side == 'admin' else 'My quotations' }}</div>
   <div class="table-responsive">
     <table class="stack-sm">
-      <thead><tr><th>Number</th><th>Customer</th>{% if ep == 'admin' %}<th>By</th>{% endif %}<th>Date</th><th class="r">Total</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Number</th><th>Customer</th>{% if side == 'admin' %}<th>By</th>{% endif %}<th>Date</th><th class="r">Total</th><th>Status</th><th></th></tr></thead>
       <tbody>
       {% for q in quotations %}
         <tr>
           <td data-label="Number"><b>{{ q.quotation_number }}</b></td>
           <td data-label="Customer">{{ q.customer_name or '-' }}</td>
-          {% if ep == 'admin' %}<td data-label="By">{{ q.created_by.full_name if q.created_by else '-' }}</td>{% endif %}
+          {% if side == 'admin' %}<td data-label="By">{{ q.created_by.full_name if q.created_by else '-' }}</td>{% endif %}
           <td data-label="Date">{{ q.created_at.strftime('%d %b %Y') if q.created_at else '' }}</td>
           <td class="r num" data-label="Total">${{ "%.2f"|format(q.total_price - (q.discount or 0)) }}{% if q.discount %}<div class="hint">after ${{ "%.2f"|format(q.discount) }} off</div>{% endif %}</td>
           <td data-label="Status">{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}</td>
           <td class="r full" style="white-space:nowrap">
-            <a class="btn btn-ghost btn-sm" href="{{ url_for(ep ~ '.download_quotation', quotation_id=q.id) }}">PDF</a>
+            <a class="btn btn-ghost btn-sm" href="{{ url_for(side ~ '.download_quotation', quotation_id=q.id) }}">PDF</a>
             {% if not q.converted %}
-              <a class="btn btn-ghost btn-sm" href="{{ url_for(ep ~ '.edit_quotation', quotation_id=q.id) }}">Edit</a>
-              {% if ep == 'admin' or q.created_by_id == current_user.id %}
-              <button type="button" class="btn-gold btn-sm" onclick="openConvert({{ q.id }}, '{{ q.quotation_number }}', '{{ url_for(ep ~ '.convert_quotation', quotation_id=q.id) }}')">Convert to sale</button>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for(side ~ '.edit_quotation', quotation_id=q.id) }}">Edit</a>
+              {% if side == 'admin' or q.created_by_id == current_user.id %}
+              <button type="button" class="btn-gold btn-sm" onclick="openConvert({{ q.id }}, '{{ q.quotation_number }}', '{{ url_for(side ~ '.convert_quotation', quotation_id=q.id) }}')">Convert to sale</button>
               {% endif %}
             {% endif %}
           </td>

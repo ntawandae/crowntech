@@ -83,6 +83,7 @@ class Config:
     MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", False)       # STARTTLS (e.g. port 80/25/587), when SSL is off
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")   # the sender address you created in Direct Mail
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")   # the SMTP password set in the Direct Mail console
+    MAIL_TIMEOUT = int(os.environ.get("MAIL_TIMEOUT", "20"))
     MAIL_FROM = os.environ.get("MAIL_FROM", "info@crowntechhub.co.zw")
     MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", os.environ.get("BUSINESS_NAME", "Crown Tech Hub"))
     EMAIL_LINK_HOURS_VERIFY = int(os.environ.get("EMAIL_LINK_HOURS_VERIFY", "24"))

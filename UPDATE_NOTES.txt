@@ -1,0 +1,17 @@
+CROWN TECH HUB - UPDATE 5  (changed files only; apply AFTER update 4)
+
+1. Unzip over your project folder and redeploy on Render. Nothing to delete, nothing new to install,
+   no database changes.
+
+WHAT'S IN IT
+- FIX: Quotations page crashed for cashiers and admins (500 error). A name clash between the page and the
+  shared layout. Fixed, and the same clash could have hidden the admin overview when opening the dashboard
+  without ?view= in the address; also fixed.
+- NEW: Admin > Email setup page: shows how email is configured and sends a real test email with a plain-English
+  result.
+- NEW: docs/EMAIL_SETUP_RENDER.md - step-by-step for Aliyun Direct Mail on Render.
+- Mailer: retries the secure connection with a broader cipher list if the first attempt fails (per Alibaba's docs).
+
+EMAIL ON RENDER IN ONE LINE
+Render's free plan blocks SMTP ports 25/465/587, so use MAIL_PORT=80, MAIL_USE_SSL=false, MAIL_USE_TLS=true,
+plus BEHIND_PROXY=true and PUBLIC_BASE_URL=https://crowntech-55z4.onrender.com. Full table in the guide.

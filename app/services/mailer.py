@@ -8,6 +8,7 @@ Failures are logged and swallowed: a customer's order must never fail because an
 import logging
 import os
 import smtplib
+import socket
 import ssl
 import threading
 from email.message import EmailMessage
@@ -34,13 +35,26 @@ def build_message(cfg, to, subject, text, html=None):
     return msg
 
 
-def _deliver_smtp(cfg, msg):
+def _tls_contexts():
+    """Normal TLS first; if the handshake fails, retry with the library's broader cipher list
+    (Alibaba's docs note some Python builds need this to talk to Direct Mail)."""
+    yield ssl.create_default_context()
+    relaxed = ssl.create_default_context()
+    try:
+        relaxed.set_ciphers("DEFAULT")
+        yield relaxed
+    except ssl.SSLError:
+        return
+
+
+def _deliver_smtp_once(cfg, msg, context):
+    timeout = cfg.get("MAIL_TIMEOUT", 20)
     if cfg["MAIL_USE_SSL"]:
-        server = smtplib.SMTP_SSL(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=20, context=ssl.create_default_context())
+        server = smtplib.SMTP_SSL(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=timeout, context=context)
     else:
-        server = smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=20)
+        server = smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=timeout)
         if cfg["MAIL_USE_TLS"]:
-            server.starttls(context=ssl.create_default_context())
+            server.starttls(context=context)
     try:
         if cfg["MAIL_USERNAME"]:
             server.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])
@@ -50,6 +64,42 @@ def _deliver_smtp(cfg, msg):
             server.quit()
         except Exception:
             pass
+
+
+def _deliver_smtp(cfg, msg):
+    last = None
+    for context in _tls_contexts():
+        try:
+            return _deliver_smtp_once(cfg, msg, context)
+        except ssl.SSLError as exc:
+            last = exc
+    raise last
+
+
+def friendly_smtp_error(exc, cfg):
+    """Turn a mail failure into something an admin can act on."""
+    host, port = cfg.get("MAIL_SERVER"), cfg.get("MAIL_PORT")
+    if isinstance(exc, smtplib.SMTPAuthenticationError):
+        return ("The mail server rejected the login. The username must be the full sender address "
+                f"({cfg.get('MAIL_USERNAME') or 'not set'}) and the password must be the SMTP password set for that "
+                "address in the Direct Mail console (Sender Addresses > Set SMTP Password), not your Alibaba Cloud login.")
+    if isinstance(exc, smtplib.SMTPSenderRefused):
+        return ("The server refused the sender address. MAIL_FROM must be a sender address created and verified in "
+                "Direct Mail, and it must match MAIL_USERNAME.")
+    if isinstance(exc, smtplib.SMTPRecipientsRefused):
+        return "The server refused the recipient address. Check it is typed correctly."
+    if isinstance(exc, smtplib.SMTPException):
+        return f"The mail server answered with an error: {exc}"
+    if isinstance(exc, ssl.SSLError):
+        return (f"The secure connection to {host}:{port} failed. Port 465 needs MAIL_USE_SSL=true; "
+                "port 80 or 25 needs MAIL_USE_SSL=false and MAIL_USE_TLS=true.")
+    if isinstance(exc, (socket.timeout, TimeoutError, ConnectionRefusedError)):
+        return (f"Could not connect to {host} on port {port} (timed out). If this site runs on Render's free plan, "
+                "outbound ports 25, 465 and 587 are blocked: use port 80 with MAIL_USE_TLS=true and MAIL_USE_SSL=false, "
+                "or move to a paid Render instance.")
+    if isinstance(exc, socket.gaierror):
+        return f"The mail server name '{host}' could not be found. Check MAIL_SERVER for typos."
+    return f"{type(exc).__name__}: {exc}"
 
 
 def _deliver_console(instance_path, msg):
@@ -100,3 +150,21 @@ def send_template(to, subject, template, **ctx):
     ctx.setdefault("biz_whatsapp", current_app.config["BUSINESS_WHATSAPP"])
     send_email(to, subject, render_template(f"email/{template}.txt", **ctx),
                render_template(f"email/{template}.html", **ctx))
+
+
+def send_email_sync(to, subject, text, html=None):
+    """Send right now and report the outcome: (ok, message). Used by the admin 'Email setup' page."""
+    from flask import current_app
+    cfg = dict(current_app.config)
+    if not to or "@" not in to:
+        return False, "Enter a valid email address."
+    msg = build_message(cfg, to, subject, text, html)
+    if not cfg["MAIL_SERVER"]:
+        _deliver_console(current_app.instance_path, msg)
+        return True, "MAIL_SERVER is empty, so nothing was sent. The email was saved in instance/outbox/ instead."
+    try:
+        _deliver_smtp(cfg, msg)
+    except Exception as exc:
+        log.warning("Test email failed: %s", exc)
+        return False, friendly_smtp_error(exc, cfg)
+    return True, f"Sent to {to}. Check the inbox (and the spam folder)."

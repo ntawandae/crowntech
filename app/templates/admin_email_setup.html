@@ -1,0 +1,33 @@
+{% extends "staff/layout.html" %}
+{% block title %}Email setup{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Email setup</h1><p>Check how email is configured and send a real test message.</p></div></div>
+
+{% if warnings %}
+<div class="flashes">{% for w in warnings %}<div class="flash-message warning">{{ w }}</div>{% endfor %}</div>
+{% endif %}
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-header">Current settings</div>
+    <div class="card-body">
+      <table><tbody>
+        {% for label, value in status %}<tr><td style="width:40%;color:var(--steel);font-weight:700">{{ label }}</td><td>{{ value }}</td></tr>{% endfor %}
+      </tbody></table>
+      <p class="hint" style="margin-top:12px">Change these in your hosting environment variables (see EMAIL_SETUP_RENDER.md), then redeploy. Passwords are never shown here.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">Send a test email</div>
+    <div class="card-body">
+      <form method="POST">
+        <label for="to">Send to</label>
+        <input type="email" id="to" name="to" value="{{ default_to }}" required>
+        <button type="submit" class="btn-gold">Send test email</button>
+      </form>
+      <p class="hint" style="margin-top:12px">The result appears at the top of the page straight away. If it says it was sent, also check the spam folder and try a Gmail address.</p>
+    </div>
+  </section>
+</div>
+{% endblock %}

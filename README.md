@@ -80,6 +80,8 @@ an admin. Any old files found in `static/uploads/contracts` are moved there on f
 * **Order emails:** reservation received, payment received (with receipt link), and order ready.
 * **Sending:** set the `MAIL_*` values (Aliyun Direct Mail SMTP). With `MAIL_SERVER` empty, emails are printed to the
   console and saved in `instance/outbox/`, so every flow can be tested before the domain is live.
+* **Render + Aliyun step-by-step:** see `docs/EMAIL_SETUP_RENDER.md`. Admins also get an **Email setup** page that
+  shows the configuration and sends a real test email.
 * Links in emails use `PUBLIC_BASE_URL`, so set it to `https://crowntechhub.co.zw` in production.
 
 ## Tests

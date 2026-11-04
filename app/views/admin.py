@@ -1136,6 +1136,67 @@ def unlock_profile(user_id):
     return redirect(url_for("admin.users"))
 
 
+@admin_bp.route('/email-setup', methods=['GET', 'POST'])
+@login_required
+def email_setup():
+    """Shows how email is configured and sends a real test message, reporting the exact result."""
+    import os
+    from ..security import client_key, record_failure, throttled
+    from ..services.mailer import send_email_sync
+
+    cfg = current_app.config
+    if request.method == 'POST':
+        key = client_key('emailtest')
+        if throttled(key, limit=10, window=3600):
+            flash("Too many test emails this hour. Try again later.", "warning")
+        else:
+            record_failure(key)
+            to = (request.form.get('to') or current_user.username).strip()
+            ok, message = send_email_sync(
+                to, f"{cfg['BUSINESS_NAME']} email test",
+                f"This is a test email from {cfg['BUSINESS_NAME']}.\n\nIf you can read this, email sending works.\n",
+                f"<p>This is a test email from <strong>{cfg['BUSINESS_NAME']}</strong>.</p><p>If you can read this, email sending works.</p>")
+            flash(message, 'success' if ok else 'danger')
+        return redirect(url_for('admin.email_setup'))
+
+    on_render = os.environ.get('RENDER', '').lower() == 'true'
+    behind_proxy = os.environ.get('BEHIND_PROXY', '').lower() in ('1', 'true', 'yes')
+    if cfg['MAIL_USE_SSL']:
+        encryption = 'SSL from the start (port 465 style)'
+    elif cfg['MAIL_USE_TLS']:
+        encryption = 'STARTTLS'
+    else:
+        encryption = 'None'
+    warnings = []
+    if not cfg['MAIL_SERVER']:
+        warnings.append("MAIL_SERVER is empty: emails are NOT being sent (they are saved in instance/outbox/ for testing).")
+    if on_render and cfg['MAIL_SERVER'] and cfg['MAIL_PORT'] in (25, 465, 587):
+        warnings.append("Render's free plan blocks outbound ports 25, 465 and 587. If the test times out, use port 80 "
+                        "with MAIL_USE_TLS=true and MAIL_USE_SSL=false, or upgrade the Render instance.")
+    if cfg['MAIL_SERVER'] and not cfg['MAIL_PASSWORD']:
+        warnings.append("MAIL_PASSWORD is empty. Set it to the SMTP password created for the sender address.")
+    if not cfg['PUBLIC_BASE_URL']:
+        warnings.append("PUBLIC_BASE_URL is not set. Links in emails will use whatever address the request arrived on. "
+                        "Set it to your site address, e.g. https://crowntechhub.co.zw")
+    elif not cfg['PUBLIC_BASE_URL'].startswith('https://'):
+        warnings.append("PUBLIC_BASE_URL should start with https:// so email links are secure.")
+    if on_render and not behind_proxy:
+        warnings.append("BEHIND_PROXY is not set to true. On Render, every visitor then looks like the same address, so "
+                        "login limits are shared by everyone and some links may use http. Set BEHIND_PROXY=true.")
+    status = [
+        ("Mode", "Sending through SMTP" if cfg['MAIL_SERVER'] else "Development: saved to instance/outbox/ only"),
+        ("Server", f"{cfg['MAIL_SERVER'] or '-'}:{cfg['MAIL_PORT']}"),
+        ("Encryption", encryption),
+        ("Login", cfg['MAIL_USERNAME'] or '-'),
+        ("Password", "set" if cfg['MAIL_PASSWORD'] else "not set"),
+        ("Sent from", f"{cfg['MAIL_FROM_NAME']} <{cfg['MAIL_FROM']}>"),
+        ("Site address", cfg['PUBLIC_BASE_URL'] or "not set"),
+        ("Google sign-in", "configured" if cfg['GOOGLE_CLIENT_ID'] and cfg['GOOGLE_CLIENT_SECRET'] else "not configured"),
+    ]
+    return render_template('admin_email_setup.html', status=status, warnings=warnings,
+                           default_to=current_user.username)
+
+
 @admin_bp.before_request
 def require_admin():
     """Blanket rule for this whole blueprint: admins only. (Route-level checks stay as a second lock.)"""
