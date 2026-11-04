@@ -768,59 +768,217 @@ def account_login():
 
 
 # ---------------- Sign in with Google (customers only) ----------------
+
 def google_enabled():
     c = current_app.config
-    return bool(c["GOOGLE_CLIENT_ID"] and c["GOOGLE_CLIENT_SECRET"])
+    return bool(
+        c.get("GOOGLE_CLIENT_ID")
+        and c.get("GOOGLE_CLIENT_SECRET")
+        and c.get("GOOGLE_REDIRECT_URI")
+    )
+
+
+def google_redirect_uri():
+    """
+    Use exactly the same redirect URI when requesting authorization
+    and exchanging the authorization code.
+    """
+    uri = (current_app.config.get("GOOGLE_REDIRECT_URI") or "").strip()
+
+    if not uri.startswith("https://"):
+        raise GoogleAuthError(
+            "Google sign-in is not configured correctly. Please try again later."
+        )
+
+    return uri.rstrip("/")
 
 
 @shop_bp.route("/account/google")
 def google_start():
     if not google_enabled():
+        current_app.logger.error(
+            "Google sign-in unavailable: OAuth settings are missing."
+        )
         abort(404)
-    state = secrets.token_urlsafe(24)
-    session["g_state"] = state
-    session["g_next"] = safe_next(request.args.get("next"), "")
-    return redirect(build_auth_url(current_app.config["GOOGLE_CLIENT_ID"],
-                                   public_base() + url_for("shop.google_callback"), state))
+
+    try:
+        state = secrets.token_urlsafe(32)
+
+        session["g_state"] = state
+        session["g_next"] = safe_next(request.args.get("next"), "")
+
+        auth_url = build_auth_url(
+            current_app.config["GOOGLE_CLIENT_ID"],
+            google_redirect_uri(),
+            state,
+        )
+
+        return redirect(auth_url)
+
+    except GoogleAuthError:
+        current_app.logger.exception("Google OAuth configuration error.")
+        flash("Google sign-in is temporarily unavailable.", "danger")
+        return redirect(url_for("shop.account_login"))
 
 
 @shop_bp.route("/account/google/callback")
 def google_callback():
     if not google_enabled():
         abort(404)
+
+    # Validate OAuth state.
     expected = session.pop("g_state", None)
-    got = request.args.get("state", "")
-    if not expected or not hmac.compare_digest(expected, got) or request.args.get("error") or not request.args.get("code"):
-        flash("Google sign-in was cancelled or couldn't be verified. Please try again.", "warning")
+    received = request.args.get("state", "")
+
+    if (
+        not expected
+        or not received
+        or not hmac.compare_digest(expected.encode(), received.encode())
+    ):
+        current_app.logger.warning("Google OAuth state validation failed.")
+        session.pop("g_next", None)
+        flash(
+            "Google sign-in could not be verified. Please try again.",
+            "warning",
+        )
         return redirect(url_for("shop.account_login"))
+
+    # Handle cancellation or denial.
+    if request.args.get("error"):
+        current_app.logger.info(
+            "Google sign-in cancelled or denied: %s",
+            request.args.get("error"),
+        )
+        session.pop("g_next", None)
+        flash("Google sign-in was cancelled.", "warning")
+        return redirect(url_for("shop.account_login"))
+
+    code = request.args.get("code")
+
+    if not code:
+        session.pop("g_next", None)
+        flash("Google did not provide an authorization code.", "danger")
+        return redirect(url_for("shop.account_login"))
+
+    # Exchange authorization code for Google profile.
     try:
-        profile = fetch_profile(current_app.config["GOOGLE_CLIENT_ID"], current_app.config["GOOGLE_CLIENT_SECRET"],
-                                public_base() + url_for("shop.google_callback"), request.args["code"])
+        profile = fetch_profile(
+            current_app.config["GOOGLE_CLIENT_ID"],
+            current_app.config["GOOGLE_CLIENT_SECRET"],
+            google_redirect_uri(),
+            code,
+        )
+
     except GoogleAuthError as exc:
+        current_app.logger.warning(
+            "Google authentication failed: %s", exc
+        )
+        session.pop("g_next", None)
         flash(str(exc), "danger")
         return redirect(url_for("shop.account_login"))
 
-    user = User.query.filter_by(google_sub=profile["sub"]).first()
-    if not user:
-        user = User.query.filter_by(username=profile["email"]).first()
-        if user and user.role != "customer":
-            flash("That email belongs to a staff account. Staff sign in with their work password.", "danger")
-            return redirect(url_for("auth.login"))
-        if user:                                    # existing customer: link Google to it
-            user.google_sub = profile["sub"]
-            user.email_verified = True
-        else:                                       # brand new customer
-            from werkzeug.security import generate_password_hash
-            user = User(username=profile["email"], password=generate_password_hash(secrets.token_urlsafe(32)),
-                        role="customer", full_name=profile["name"], email_verified=True, google_sub=profile["sub"])
-            db.session.add(user)
-        db.session.commit()
-        attach_guest_orders(user)
-    if user.role in ("disabled", "system"):
-        flash("This account is disabled.", "danger")
+    # Normalise the email the same way login/registration do.
+    email = (profile["email"] or "").strip().lower()
+
+    try:
+        # Find an existing account linked to this Google identity.
+        user = User.query.filter_by(
+            google_sub=profile["sub"]
+        ).first()
+
+        if user:
+            if user.role in ("disabled", "system"):
+                flash("This account is disabled.", "danger")
+                return redirect(url_for("shop.account_login"))
+
+            if user.role != "customer":
+                flash(
+                    "This account cannot use customer Google sign-in.",
+                    "danger",
+                )
+                return redirect(url_for("shop.account_login"))
+
+        else:
+            # Check whether this email already has an account.
+            user = User.query.filter_by(
+                username=email
+            ).first()
+
+            if user and user.role in ("disabled", "system"):
+                flash("This account is disabled.", "danger")
+                return redirect(url_for("shop.account_login"))
+
+            # Never link Google automatically to staff accounts.
+            if user and user.role != "customer":
+                flash(
+                    "That email belongs to a staff account. "
+                    "Staff must sign in using their work password.",
+                    "danger",
+                )
+                return redirect(url_for("auth.login"))
+
+            if user:
+                # Link Google to the existing customer account.
+                if user.google_sub and user.google_sub != profile["sub"]:
+                    flash(
+                        "This email is already linked to another Google account.",
+                        "danger",
+                    )
+                    return redirect(url_for("shop.account_login"))
+
+                user.google_sub = profile["sub"]
+                user.email_verified = True
+
+                if not user.full_name:
+                    user.full_name = profile["name"]
+
+            else:
+                # Create a new customer account.
+                from werkzeug.security import generate_password_hash
+
+                user = User(
+                    username=email,
+                    password=generate_password_hash(
+                        secrets.token_urlsafe(48)
+                    ),
+                    role="customer",
+                    full_name=profile["name"],
+                    email_verified=True,
+                    google_sub=profile["sub"],
+                )
+
+                db.session.add(user)
+
+            db.session.commit()
+
+            # Attach previous guest orders to the verified customer.
+            attach_guest_orders(user)
+
+    except Exception:
+        db.session.rollback()
+
+        current_app.logger.exception(
+            "Google customer account creation/linking failed."
+        )
+
+        session.pop("g_next", None)
+        flash(
+            "We couldn't finish setting up your account. Please try again.",
+            "danger",
+        )
         return redirect(url_for("shop.account_login"))
+
+    if user.role != "customer":
+        flash("This account cannot use customer Google sign-in.", "danger")
+        return redirect(url_for("shop.account_login"))
+
     login_user(user)
-    return redirect(safe_next(session.pop("g_next", ""), home_for(user)))
+
+    next_url = session.pop("g_next", "")
+
+    return redirect(
+        safe_next(next_url, home_for(user))
+    )
 
 
 @shop_bp.route("/account")
