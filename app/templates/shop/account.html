@@ -1,24 +1,27 @@
 {% extends 'shop/base.html' %}
 {% block title %}My orders | {{ biz.name }}{% endblock %}
 {% block content %}
-<div class="wrap page">
-  <div class="section-head"><div><h1 style="font-size:1.5rem;margin-bottom:2px">My orders</h1><span class="muted">{{ current_user.full_name }} &middot; {{ current_user.username }}</span></div>
-  <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.logout') }}">Sign out</a></div>
-  {% if orders %}
-  <div class="table-wrap"><table class="tbl">
-    <thead><tr><th>Order</th><th>Placed</th><th>Status</th><th class="r">Total</th></tr></thead>
-    <tbody>
-    {% for o in orders %}
-      <tr>
-        <td><a href="{{ url_for('shop.order_view', order_number=o.order_number) }}"><strong>{{ o.order_number }}</strong></a></td>
-        <td>{{ o.created_at|when }}</td>
-        <td><span class="badge {{ 'badge-ok' if o.status in ('paid','ready','completed') else ('badge-bad' if o.status == 'cancelled' else 'badge-warn') }}">{{ o.status_label }}</span></td>
-        <td class="r num">{{ o.total|money }}</td>
-      </tr>
-    {% endfor %}
-    </tbody></table></div>
-  {% else %}
-  <div class="empty"><h2>No orders yet</h2><p class="muted">When you place an order it will show up here.</p><a class="btn btn-gold" href="{{ url_for('shop.catalog') }}">Browse products</a></div>
-  {% endif %}
-</div>
+<div class="wrap page"><div class="acct-layout">
+  {% include 'shop/_account_nav.html' %}
+  <div class="acct-main">
+    <h1>My orders</h1>
+    <p class="muted">Everything you've ordered from {{ biz.name }}, newest first.</p>
+    {% if orders %}
+    <div class="table-wrap"><table class="tbl tbl-compact">
+      <thead><tr><th>Order</th><th class="hide-xs">Placed</th><th>Status</th><th class="r">Total</th></tr></thead>
+      <tbody>
+      {% for o in orders %}
+        <tr>
+          <td><a href="{{ url_for('shop.order_view', order_number=o.order_number) }}"><strong>{{ o.order_number }}</strong></a><div class="muted small show-xs">{{ o.created_at|when('%d %b %Y') }}</div></td>
+          <td class="hide-xs">{{ o.created_at|when }}</td>
+          <td><span class="badge {{ 'badge-ok' if o.status in ('paid','ready','completed') else ('badge-bad' if o.status == 'cancelled' else 'badge-warn') }}">{{ o.status_label }}</span></td>
+          <td class="r num">{{ o.total|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody></table></div>
+    {% else %}
+    <div class="empty"><h2>No orders yet</h2><p class="muted">When you place an order it will show up here.</p><a class="btn btn-gold" href="{{ url_for('shop.catalog') }}">Browse products</a></div>
+    {% endif %}
+  </div>
+</div></div>
 {% endblock %}

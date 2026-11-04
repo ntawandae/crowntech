@@ -1,12 +1,8 @@
 {% extends "staff/layout.html" %}
 {% block title %}Users{% endblock %}
 {% block content %}
-    
 
     <h2>User Management</h2>
-
-    <!-- Flash messages -->
-    
 
     <!-- Create User Button -->
     <div style="margin-bottom: 20px;">
@@ -42,8 +38,11 @@
                         {% endif %}
                     </td>
                     <td>
+                        <!-- Edit name / email / role -->
+                        <button type="button" class="btn btn-primary" onclick="openEditModal({{ user.id }})">Edit</button>
+
                         <!-- View Details -->
-                        <button class="btn btn-info" onclick="openDetailsModal({{ user.id }})">View Details</button>
+                        <button type="button" class="btn btn-info" onclick="openDetailsModal({{ user.id }})">View Details</button>
 
                         <!-- Unlock Profile -->
                         {% if profile and not profile.editable %}
@@ -92,14 +91,37 @@
         </div>
     </div>
 
+    <!-- Edit User Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3 id="editTitle">Edit user</h3>
+            <form method="POST" id="editForm" action="">
+                <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                <label for="editName">Full name</label>
+                <input type="text" id="editName" name="full_name" required minlength="2" maxlength="100" style="width:100%;">
+                <label for="editEmail">Email (used to sign in)</label>
+                <input type="email" id="editEmail" name="email" required maxlength="100" style="width:100%;">
+                <div id="editRoleWrap">
+                    <label for="editRole">Role</label>
+                    <select id="editRole" name="role" style="width:100%;">
+                        <option value="cashier">Cashier</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <p id="editNote" style="font-size:.84rem;color:#64748b;margin:4px 0 0;"></p>
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-danger" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- View Details Modal -->
     <div id="detailsModal" class="modal">
         <div class="modal-content">
             <h3 id="detailsTitle">User Profile Details</h3>
-            <div id="detailsContent">
-                <!-- Filled via JavaScript -->
-                <p>Loading...</p>
-            </div>
+            <div id="detailsContent"></div>
             <div class="modal-buttons">
                 <button type="button" class="btn btn-primary" onclick="closeDetailsModal()">Close</button>
             </div>
@@ -107,109 +129,87 @@
     </div>
 
     <script>
-        // Create User Modal
-        function openCreateModal() {
-            document.getElementById('createModal').style.display = 'flex';
-        }
-        function closeCreateModal() {
-            document.getElementById('createModal').style.display = 'none';
-        }
+        // User data for the pop-ups (safely encoded by the server).
+        const userProfiles = {{ profiles|tojson }};
+        const currentUserId = {{ current_user.id|tojson }};
+        const editUrlTemplate = {{ url_for('admin.edit_user', user_id=0)|tojson }};
 
-        // View Details Modal
-        function openDetailsModal(userId) {
-            const modal = document.getElementById('detailsModal');
-            const title = document.getElementById('detailsTitle');
-            const content = document.getElementById('detailsContent');
-
-            // You need to pass user data via template or fetch via API. Here we assume data is injected.
-            // For simplicity, we'll use a data attribute or assume it's rendered in script (see note below)
-
-            // Placeholder: In real app, you'd fetch via AJAX or embed data in page
-            content.innerHTML = `
-                <p><strong>Note:</strong> Full profile details require server-side rendering or API call.</p>
-                <p>To implement properly, pass user profile data via Jinja or add an endpoint to fetch JSON.</p>
-            `;
-
-            // Temporary demo content (replace with real data in production)
-            const dummyData = {
-                phone: "N/A", id_number: "N/A", dob: "N/A", sex: "N/A",
-                address: "N/A", qualifications: "N/A", next_of_kin: "N/A",
-                next_of_kin_contact: "N/A", next_of_kin_address: "N/A", contract: false
-            };
-
-            // In production: loop through users and embed data in JS object
-            modal.style.display = 'flex';
+        function esc(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+                return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+            });
         }
 
-        function closeDetailsModal() {
-            document.getElementById('detailsModal').style.display = 'none';
-        }
+        // ---- Create user ----
+        function openCreateModal() { document.getElementById('createModal').style.display = 'flex'; }
+        function closeCreateModal() { document.getElementById('createModal').style.display = 'none'; }
 
-        // Close modals when clicking outside
-        window.onclick = function(event) {
-            const createModal = document.getElementById('createModal');
-            const detailsModal = document.getElementById('detailsModal');
-            if (event.target === createModal) closeCreateModal();
-            if (event.target === detailsModal) closeDetailsModal();
-        }
-    </script>
+        // ---- Edit user ----
+        function openEditModal(userId) {
+            const data = userProfiles[userId];
+            if (!data) return;
+            document.getElementById('editTitle').textContent = 'Edit ' + (data.full_name || 'user');
+            document.getElementById('editForm').action = editUrlTemplate.replace(/0$/, String(userId));
+            document.getElementById('editName').value = data.full_name;
+            document.getElementById('editEmail').value = data.email;
 
-    <!-- Embed user profile data for JS access (Recommended for full functionality) -->
-    <script>
-        // Pass user profiles to JS for detailed view
-        const userProfiles = {
-            {% for user in users %}
-                {{ user.id }}: {
-                    full_name: "{{ user.full_name }}",
-                    email: "{{ user.username }}",
-                    role: "{{ user.role }}",
-                    phone_number: "{{ user.profile.phone_number or 'N/A' }}",
-                    id_number: "{{ user.profile.id_number or 'N/A' }}",
-                    dob: "{{ user.profile.dob or 'N/A' }}",
-                    sex: "{{ user.profile.sex or 'N/A' }}",
-                    address: "{{ user.profile.address or 'N/A' }}",
-                    qualifications: "{{ user.profile.qualifications or 'N/A' }}",
-                    next_of_kin: "{{ user.profile.next_of_kin or 'N/A' }}",
-                    next_of_kin_contact: "{{ user.profile.next_of_kin_contact or 'N/A' }}",
-                    next_of_kin_address: "{{ user.profile.next_of_kin_address or 'N/A' }}",
-                    contract_file: "{{ url_for('auth.contract', user_id=user.id) if user.profile and user.profile.contract_file else '' }}"
-                }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        };
-
-        function openDetailsModal(userId) {
-            const modal = document.getElementById('detailsModal');
-            const title = document.getElementById('detailsTitle');
-            const content = document.getElementById('detailsContent');
-            const data = userProfiles[userId] || {};
-
-            title.textContent = `${data.full_name || 'User'} - Full Profile`;
-
-            let contractLink = '';
-            if (data.contract_file) {
-                contractLink = `<a href="${data.contract_file}" target="_blank" class="contract-link">View Contract</a>`;
+            const roleWrap = document.getElementById('editRoleWrap');
+            const roleSel = document.getElementById('editRole');
+            const note = document.getElementById('editNote');
+            note.textContent = '';
+            if (data.role === 'disabled') {
+                roleWrap.style.display = 'none';
+                roleSel.disabled = true;
+                note.textContent = 'This account is disabled. Enable it first if you want to change its role.';
+            } else if (userId === currentUserId) {
+                roleWrap.style.display = '';
+                roleSel.value = data.role;
+                roleSel.disabled = true;
+                note.textContent = "You can't change your own role.";
             } else {
-                contractLink = 'No contract uploaded';
+                roleWrap.style.display = '';
+                roleSel.disabled = false;
+                roleSel.value = data.role;
             }
-
-            content.innerHTML = `
-                <div class="profile-grid">
-                    <div class="profile-item"><strong>Email</strong>${data.email}</div>
-                    <div class="profile-item"><strong>Role</strong>${data.role ? data.role.charAt(0).toUpperCase() + data.role.slice(1) : 'N/A'}</div>
-                    <div class="profile-item"><strong>Phone Number</strong>${data.phone_number}</div>
-                    <div class="profile-item"><strong>ID Number</strong>${data.id_number}</div>
-                    <div class="profile-item"><strong>Date of Birth</strong>${data.dob}</div>
-                    <div class="profile-item"><strong>Sex</strong>${data.sex}</div>
-                    <div class="profile-item"><strong>Address</strong>${data.address}</div>
-                    <div class="profile-item"><strong>Qualifications</strong>${data.qualifications}</div>
-                    <div class="profile-item"><strong>Next of Kin</strong>${data.next_of_kin}</div>
-                    <div class="profile-item"><strong>Kin Contact</strong>${data.next_of_kin_contact}</div>
-                    <div class="profile-item"><strong>Kin Address</strong>${data.next_of_kin_address}</div>
-                    <div class="profile-item"><strong>Contract</strong>${contractLink}</div>
-                </div>
-            `;
-
-            modal.style.display = 'flex';
+            document.getElementById('editModal').style.display = 'flex';
+            document.getElementById('editName').focus();
         }
+        function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+
+        // ---- View details ----
+        function openDetailsModal(userId) {
+            const data = userProfiles[userId] || {};
+            document.getElementById('detailsTitle').textContent = (data.full_name || 'User') + ' - Full Profile';
+
+            const contractLink = data.contract_file
+                ? '<a href="' + esc(data.contract_file) + '" target="_blank" rel="noopener" class="contract-link">View Contract</a>'
+                : 'No contract uploaded';
+            const role = data.role ? data.role.charAt(0).toUpperCase() + data.role.slice(1) : 'N/A';
+            const rows = [
+                ['Email', esc(data.email)], ['Role', esc(role)],
+                ['Phone Number', esc(data.phone_number)], ['ID Number', esc(data.id_number)],
+                ['Date of Birth', esc(data.dob)], ['Sex', esc(data.sex)],
+                ['Address', esc(data.address)], ['Qualifications', esc(data.qualifications)],
+                ['Next of Kin', esc(data.next_of_kin)], ['Kin Contact', esc(data.next_of_kin_contact)],
+                ['Kin Address', esc(data.next_of_kin_address)], ['Contract', contractLink]
+            ];
+            document.getElementById('detailsContent').innerHTML =
+                '<div class="profile-grid">' +
+                rows.map(function (r) { return '<div class="profile-item"><strong>' + r[0] + '</strong>' + r[1] + '</div>'; }).join('') +
+                '</div>';
+            document.getElementById('detailsModal').style.display = 'flex';
+        }
+        function closeDetailsModal() { document.getElementById('detailsModal').style.display = 'none'; }
+
+        // Close pop-ups when clicking the dark backdrop or pressing Escape
+        window.addEventListener('click', function (event) {
+            ['createModal', 'editModal', 'detailsModal'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (event.target === el) el.style.display = 'none';
+            });
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') { closeCreateModal(); closeEditModal(); closeDetailsModal(); }
+        });
     </script>
 {% endblock %}

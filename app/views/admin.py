@@ -11,6 +11,7 @@ from sqlalchemy import func
 from xhtml2pdf import pisa
 from io import BytesIO
 import os
+import re
 import json
 import secrets
 from werkzeug.security import generate_password_hash
@@ -544,6 +545,15 @@ def record_expense():
         flash("Please provide valid expense details.", "danger")
         return redirect(url_for('admin.admin_dashboard', view='expenses'))
 
+    if not request.form.get('confirm_duplicate'):
+        dup = pos.find_recent_duplicate_entry(Expense, description, amount)
+        if dup:
+            details = [("Earlier entry", f"{dup['row'].description} - ${dup['row'].amount:.2f}, recorded {dup['ago']} by {dup['who']}"),
+                       ("This entry", f"{description} - ${amount:.2f}")]
+            return pos.duplicate_prompt(f"The same expense was already recorded {dup['ago']}.", details,
+                                        "Record this expense anyway",
+                                        url_for('admin.admin_dashboard', view='expenses'))
+
     new_exp = Expense(description=description, amount=amount, recorded_by=current_user.id, timestamp=zim_now())
     db.session.add(new_exp)
     db.session.commit()
@@ -1071,6 +1081,64 @@ def create_user():
     flash("User created. They will be asked to choose their own password at first sign-in.", "success")
     return redirect(url_for("admin.users"))
 
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@admin_bp.route("/users/edit/<int:user_id>", methods=["POST"])
+@login_required
+def edit_user(user_id):
+    """Change a staff member's name, email and (optionally) role."""
+    if current_user.role != "admin":
+        return redirect(url_for("auth.login"))
+    from ..security import verify_csrf
+    verify_csrf()
+
+    user = User.query.get_or_404(user_id)
+    if user.role in ("customer", "system"):
+        flash("That account is not managed here.", "warning")
+        return redirect(url_for("admin.users"))
+
+    full_name = " ".join((request.form.get("full_name") or "").split())
+    email = (request.form.get("email") or "").strip().lower()
+    new_role = (request.form.get("role") or user.role).strip()
+
+    if len(full_name) < 2 or len(full_name) > 100:
+        flash("Enter the person's full name (2 to 100 characters).", "danger")
+        return redirect(url_for("admin.users"))
+    if not EMAIL_PATTERN.match(email) or len(email) > 100:
+        flash("Enter a valid email address.", "danger")
+        return redirect(url_for("admin.users"))
+    clash = User.query.filter(User.username == email, User.id != user.id).first()
+    if clash:
+        flash(f"{email} is already used by another account.", "danger")
+        return redirect(url_for("admin.users"))
+
+    # Role changes: only between admin and cashier. Disabled accounts are re-enabled with the Enable button.
+    if user.role in ("admin", "cashier") and new_role in ("admin", "cashier") and new_role != user.role:
+        if user.id == current_user.id:
+            flash("You can't change your own role. Ask another admin to do it.", "warning")
+            return redirect(url_for("admin.users"))
+        if user.role == "admin" and User.query.filter_by(role="admin").count() <= 1:
+            flash("There must always be at least one admin.", "danger")
+            return redirect(url_for("admin.users"))
+        user.role = new_role
+        changed_role = True
+    else:
+        changed_role = False
+
+    changed = changed_role or user.username != email or (user.full_name or "") != full_name
+    user.username = email
+    user.full_name = full_name
+
+    if not changed:
+        flash("No changes to save.", "info")
+        return redirect(url_for("admin.users"))
+
+    db.session.commit()
+    flash(f"{full_name}'s details were updated.", "success")
+    return redirect(url_for("admin.users"))
+
+
 @admin_bp.route("/users")
 @login_required
 def users():
@@ -1080,7 +1148,27 @@ def users():
     # Staff only - online customers and the internal "Online shop" account are not managed here.
     users = (User.query.filter(User.role.in_(["admin", "cashier", "disabled"]))
              .order_by(User.role, User.full_name).all())
-    return render_template("admin_users.html", users=users)
+
+    # Data for the "View details" and "Edit" pop-ups (rendered with |tojson, so quotes etc. are safe).
+    profiles = {}
+    for u in users:
+        p = u.profile
+        profiles[u.id] = {
+            "full_name": u.full_name or "",
+            "email": u.username,
+            "role": u.role,
+            "phone_number": (p.phone_number if p else None) or "N/A",
+            "id_number": (p.id_number if p else None) or "N/A",
+            "dob": (p.dob.strftime("%d %b %Y") if p and p.dob else "N/A"),
+            "sex": (p.sex if p else None) or "N/A",
+            "address": (p.address if p else None) or "N/A",
+            "qualifications": (p.qualifications if p else None) or "N/A",
+            "next_of_kin": (p.next_of_kin if p else None) or "N/A",
+            "next_of_kin_contact": (p.next_of_kin_contact if p else None) or "N/A",
+            "next_of_kin_address": (p.next_of_kin_address if p else None) or "N/A",
+            "contract_file": url_for("auth.contract", user_id=u.id) if p and p.contract_file else "",
+        }
+    return render_template("admin_users.html", users=users, profiles=profiles)
 @admin_bp.route("/users/toggle/<int:user_id>", methods=["POST"])
 @login_required
 def toggle_user(user_id):

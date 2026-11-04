@@ -1,0 +1,31 @@
+{% extends "staff/layout.html" %}
+{% block title %}Possible duplicate{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px;margin:20px auto">
+  <div class="card-header">Possible duplicate</div>
+  <div class="card-body">
+    <p style="font-size:1.05rem;margin-top:0"><b>{{ headline }}</b></p>
+    <dl style="display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0 0 16px">
+      {% for label, value in details %}
+        <dt style="color:#54617a;font-weight:600">{{ label }}</dt><dd style="margin:0;overflow-wrap:anywhere">{{ value }}</dd>
+      {% endfor %}
+    </dl>
+    <p>Was this a second, separate transaction? If it was recorded by mistake or pressed twice, go back and nothing new is saved.</p>
+    <form method="POST" action="{{ post_url }}" id="dupForm">
+      {% for name, value in fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+      <input type="hidden" name="confirm_duplicate" value="1">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <a class="btn" href="{{ back_url }}" autofocus>{{ back_label }}</a>
+        <button type="submit" class="btn btn-warning" id="dupConfirm">{{ confirm_label }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  document.getElementById('dupForm').addEventListener('submit', function () {
+    var b = document.getElementById('dupConfirm');
+    setTimeout(function () { b.disabled = true; }, 0);               // one click records one entry
+    setTimeout(function () { b.disabled = false; }, 5000);           // (a receipt download leaves this page open)
+  });
+</script>
+{% endblock %}

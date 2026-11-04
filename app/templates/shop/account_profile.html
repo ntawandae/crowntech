@@ -1,0 +1,50 @@
+{% extends 'shop/base.html' %}
+{% block title %}My details | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap page"><div class="acct-layout">
+  {% include 'shop/_account_nav.html' %}
+  <div class="acct-main">
+    <h1>My details</h1>
+    <p class="muted">Your name and phone number are filled in for you at checkout.</p>
+
+    <section class="panel">
+      <h2>About you</h2>
+      <form method="post" action="{{ url_for('shop.account_profile') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <div class="grid-2">
+          <div class="field"><label for="name">Full name</label><input id="name" name="name" value="{{ request.form.get('name', current_user.full_name or '') }}" autocomplete="name" maxlength="100" required></div>
+          <div class="field"><label for="phone">Phone number</label><input id="phone" name="phone" value="{{ request.form.get('phone', current_user.phone or '') }}" autocomplete="tel" inputmode="tel" maxlength="30"><div class="hint">So we can reach you about orders and deliveries.</div></div>
+        </div>
+        <div class="field"><label for="email">Email</label><input id="email" value="{{ current_user.username }}" readonly aria-describedby="email-hint">
+          <div class="hint" id="email-hint">This is what you sign in with. To change it, {% if biz.whatsapp %}<a href="https://wa.me/{{ biz.whatsapp }}">message us on WhatsApp</a>{% elif biz.email %}<a href="mailto:{{ biz.email }}">email us</a>{% else %}contact the shop{% endif %}.</div></div>
+        <div class="form-actions"><button class="btn btn-gold" type="submit">Save changes</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Delivery addresses</h2>
+      {% if current_user.addresses %}
+        <p class="muted" style="margin:0 0 12px">You have {{ current_user.addresses|length }} saved {{ 'address' if current_user.addresses|length == 1 else 'addresses' }}.</p>
+      {% else %}
+        <p class="muted" style="margin:0 0 12px">Save an address once and pick it at checkout whenever you choose delivery.</p>
+      {% endif %}
+      <a class="btn btn-ghost" href="{{ url_for('shop.account_addresses') }}">Manage addresses</a>
+    </section>
+
+    <section class="panel">
+      <h2>Password</h2>
+      {% if current_user.google_sub %}<p class="muted small" style="margin-top:0">Google sign-in is linked to this account.</p>{% endif %}
+      <form method="post" action="{{ url_for('shop.account_password') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <div class="field"><label for="cur">Current password</label><input id="cur" type="password" name="current_password" autocomplete="current-password" required>
+          <div class="hint">Signed up with Google and never set a password? <a href="{{ url_for('shop.forgot_password') }}">Set one here</a>.</div></div>
+        <div class="grid-2">
+          <div class="field"><label for="np">New password</label><input id="np" type="password" name="new_password" autocomplete="new-password" minlength="8" required><div class="hint">At least 8 characters.</div></div>
+          <div class="field"><label for="cp">Confirm new password</label><input id="cp" type="password" name="confirm_password" autocomplete="new-password" minlength="8" required></div>
+        </div>
+        <div class="form-actions"><button class="btn" type="submit">Change password</button></div>
+      </form>
+    </section>
+  </div>
+</div></div>
+{% endblock %}

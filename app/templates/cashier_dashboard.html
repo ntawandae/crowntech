@@ -66,7 +66,7 @@ function filterTable() {
         {% endfor %}
       </div>
 
-      <form method="POST" id="saleForm" class="pay-box" autocomplete="off">
+      <form method="POST" id="saleForm" class="pay-box once" autocomplete="off">
         <div>
           <label>Discount</label>
           <div class="pay-row" style="grid-template-columns: auto 1fr; align-items: center">
@@ -153,7 +153,7 @@ function filterTable() {
   <section class="card">
     <div class="card-header">Record expense</div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('cashier.record_expense') }}">
+      <form method="POST" class="once" action="{{ url_for('cashier.record_expense') }}">
         <label>Description</label><input type="text" name="description" required>
         <label>Amount ($)</label><input type="number" step="0.01" min="0" name="amount" required>
         <button type="submit">Record expense</button>
@@ -163,7 +163,7 @@ function filterTable() {
   <section class="card">
     <div class="card-header">Record extra income</div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('cashier.record_income') }}">
+      <form method="POST" class="once" action="{{ url_for('cashier.record_income') }}">
         <label>Description</label><input type="text" name="description" required>
         <label>Amount ($)</label><input type="number" step="0.01" min="0" name="amount" required>
         <button type="submit">Record income</button>
@@ -227,6 +227,17 @@ function filterTable() {
     if (f) { e.preventDefault(); submitCart(f); }
   });
   initTotals();
+
+  /* One click, one record: a second click on the same form within a few seconds is ignored. */
+  document.addEventListener('submit', e => {
+    const f = e.target;
+    if (!f.classList || !f.classList.contains('once')) return;
+    if (f.dataset.busy) { e.preventDefault(); return; }
+    f.dataset.busy = '1';
+    const buttons = f.querySelectorAll('button[type=submit]');
+    setTimeout(() => buttons.forEach(b => b.disabled = true), 0);
+    setTimeout(() => { delete f.dataset.busy; buttons.forEach(b => b.disabled = false); if (f.id === 'saleForm') initTotals(); }, 5000);
+  });
 })();
 </script>
 {% endblock %}

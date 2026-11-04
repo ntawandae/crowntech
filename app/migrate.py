@@ -14,6 +14,7 @@ NEW_COLUMNS = {
         ("email_verified", "BOOLEAN DEFAULT {TRUE}"),          # everyone who already exists counts as verified
         ("must_change_password", "BOOLEAN DEFAULT {FALSE}"),
         ("google_sub", "VARCHAR(64)"),
+        ("phone", "VARCHAR(30)"),
     ],
     "receipt": [
         ("discount", "FLOAT DEFAULT 0"),

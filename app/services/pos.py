@@ -129,6 +129,98 @@ def next_receipt_number(prefix, day):
     return f"{head}{n:04d}"
 
 
+# ----------------------------------------------------------------------
+# double-entry guard
+# ----------------------------------------------------------------------
+def duplicate_window_minutes():
+    """How far back to look for a repeat (config DUPLICATE_WINDOW_MINUTES; 0 switches the check off)."""
+    from flask import current_app
+    try:
+        return max(0, int(current_app.config.get("DUPLICATE_WINDOW_MINUTES", 10) or 0))
+    except (TypeError, ValueError):
+        return 10
+
+
+def ago_text(seconds):
+    """'just now', '3 minutes ago' ... for the confirmation screen."""
+    seconds = max(0, int(seconds))
+    if seconds < 45:
+        return "just now"
+    minutes = round(seconds / 60)
+    return "1 minute ago" if minutes <= 1 else f"{minutes} minutes ago"
+
+
+def find_recent_duplicate_sale(lines, minutes=None):
+    """
+    Look for a till sale made in the last `minutes` with exactly the same products and quantities
+    (by any cashier). Online-shop receipts (WEB-...) are ignored. Returns None or a dict:
+    {receipt, who, ago, seconds}.
+    """
+    from datetime import timedelta
+    from collections import Counter
+    from ..models import Receipt, User
+    from ..utils.timeutil import zim_now
+
+    minutes = duplicate_window_minutes() if minutes is None else minutes
+    if not minutes or not lines:
+        return None
+    wanted = Counter()
+    for ln in lines:
+        wanted[ln["product"].id] += int(ln["qty"])
+
+    now = zim_now()
+    recent = (Receipt.query
+              .filter(Receipt.receipt_number.like("SALE-%"), Receipt.timestamp >= now - timedelta(minutes=minutes))
+              .order_by(Receipt.timestamp.desc()).limit(50).all())
+    for receipt in recent:
+        have = Counter()
+        for sale in receipt.sales:               # reversed lines are deleted, so a reversed sale never matches
+            have[sale.product_id] += int(sale.quantity or 0)
+        if have == wanted:
+            seconds = (now - receipt.timestamp).total_seconds()
+            who = User.query.get(receipt.cashier_id)
+            return {"receipt": receipt, "who": (who.full_name or who.username) if who else "another cashier",
+                    "ago": ago_text(seconds), "seconds": seconds}
+    return None
+
+
+def find_recent_duplicate_entry(model, description, amount, minutes=None):
+    """Same idea for an Expense / ExtraIncome row: same description (ignoring case) and same amount."""
+    from datetime import timedelta
+    from sqlalchemy import func
+    from ..models import User
+    from ..utils.timeutil import zim_now
+
+    minutes = duplicate_window_minutes() if minutes is None else minutes
+    if not minutes:
+        return None
+    now = zim_now()
+    row = (model.query
+           .filter(model.timestamp >= now - timedelta(minutes=minutes),
+                   func.lower(func.trim(model.description)) == (description or "").strip().lower(),
+                   func.abs(model.amount - float(amount)) < 0.005)
+           .order_by(model.timestamp.desc()).first())
+    if not row:
+        return None
+    seconds = (now - row.timestamp).total_seconds()
+    who_id = getattr(row, "recorded_by", None)
+    who = User.query.get(who_id) if who_id else None
+    return {"row": row, "who": (who.full_name or who.username) if who else "someone",
+            "ago": ago_text(seconds), "seconds": seconds}
+
+
+def duplicate_prompt(headline, details, confirm_label, back_url, back_label="No, go back"):
+    """
+    The 'this looks like a repeat - record it anyway?' screen. It re-posts exactly what was submitted
+    (every form field) plus confirm_duplicate=1, to the same address.
+    details: [(label, value)] describing the earlier record.
+    """
+    from flask import render_template, request
+    fields = [(k, v) for k, v in request.form.items(multi=True) if k not in ("confirm_duplicate",)]
+    return render_template("staff/confirm_duplicate.html", headline=headline, details=details, fields=fields,
+                           post_url=request.path, confirm_label=confirm_label, back_url=back_url, back_label=back_label)
+
+
 def complete_sale(lines, user, pricing, customer=None, delivery_address=None, quotation=None):
     """
     Record a finished sale.

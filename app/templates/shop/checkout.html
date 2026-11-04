@@ -12,7 +12,7 @@
           <div class="field"><label for="name">Full name</label><input id="name" name="name" value="{{ form.name }}" autocomplete="name" required></div>
           <div class="field"><label for="phone">Phone number</label><input id="phone" name="phone" value="{{ form.phone }}" autocomplete="tel" inputmode="tel" required></div>
         </div>
-        <div class="field" style="margin-bottom:0"><label for="email">Email</label><input id="email" type="email" name="email" value="{{ form.email }}" autocomplete="email" required><div class="hint">Your receipt and order link are sent here. No account needed.</div></div>
+        <div class="field" style="margin-bottom:0"><label for="email">Email</label><input id="email" type="email" name="email" value="{{ form.email }}" autocomplete="email" required><div class="hint">Your receipt and order link are sent here.{% if not is_customer %} No account needed.{% else %} Change your saved details in <a href="{{ url_for('shop.account_profile') }}">My details</a>.{% endif %}</div></div>
       </section>
 
       <section class="panel">
@@ -23,9 +23,25 @@
           <label><input type="radio" name="delivery" value="delivery" {{ 'checked' if form.delivery == 'delivery' }}><span><strong>Delivery</strong><span class="hint">{% if delivery_fee %}Delivery fee {{ delivery_fee|money }}.{% else %}We'll confirm the delivery cost with you after you order.{% endif %}</span></span></label>
           {% endif %}
         </div>
-        <div class="field" id="address-field" style="margin-top:14px;margin-bottom:0" hidden>
-          <label for="address">Delivery address</label>
-          <textarea id="address" name="address" autocomplete="street-address">{{ form.address }}</textarea>
+        <div class="addr-pick" id="address-field" hidden>
+          {% if is_customer and saved_addresses %}
+          <div class="choice" role="radiogroup" aria-label="Delivery address">
+            {% for a in saved_addresses %}
+            <label><input type="radio" name="address_choice" value="{{ a.id }}" {{ 'checked' if form.address_choice == a.id|string }}><span><strong>{{ a.label }}{% if a.is_default %} <span class="badge badge-gold">Default</span>{% endif %}</strong><span class="addr-text">{{ a.full }}</span></span></label>
+            {% endfor %}
+            <label><input type="radio" name="address_choice" value="new" {{ 'checked' if form.address_choice == 'new' }}><span><strong>Use a different address</strong><span class="addr-text">Type an address for this order only, or save it for next time.</span></span></label>
+          </div>
+          {% endif %}
+          <div class="addr-new" id="address-new">
+            <div class="field" style="margin-bottom:0"><label for="address">Delivery address</label>
+              <textarea id="address" name="address" maxlength="220" autocomplete="street-address" placeholder="Street, suburb, town and any landmarks">{{ form.address }}</textarea></div>
+            {% if is_customer %}
+            <label class="check" style="margin-top:10px"><input type="checkbox" name="save_address" value="1" {{ 'checked' if form.save_address }}><span>Save this address to my account</span></label>
+            {% else %}
+            <p class="hint" style="margin-top:10px">Have an account? <a href="{{ url_for('shop.account_login', next=url_for('shop.checkout')) }}">Sign in</a> to use your saved addresses.</p>
+            {% endif %}
+          </div>
+          {% if is_customer %}<p class="addr-manage"><a href="{{ url_for('shop.account_addresses', next=url_for('shop.checkout')) }}">{{ 'Manage saved addresses' if saved_addresses else 'Add an address to your account' }}</a></p>{% endif %}
         </div>
         <div class="field" style="margin:14px 0 0"><label for="notes">Notes for us (optional)</label><input id="notes" name="notes" value="{{ form.notes }}" maxlength="500"></div>
       </section>
@@ -67,18 +83,23 @@
 (function () {
   var radios = document.querySelectorAll('input[name="delivery"]');
   var addr = document.getElementById('address-field');
+  var newBox = document.getElementById('address-new');
+  var picks = document.querySelectorAll('input[name="address_choice"]');
   var feeRow = document.getElementById('fee-row');
   var grand = document.getElementById('grand');
   function update() {
     var chosen = document.querySelector('input[name="delivery"]:checked');
     var delivery = chosen && chosen.value === 'delivery';
     addr.hidden = !delivery;
+    var pick = document.querySelector('input[name="address_choice"]:checked');
+    newBox.hidden = !!(pick && pick.value !== 'new');      // a saved address is chosen: no need to type one
     var fee = parseFloat(grand.dataset.fee) || 0;
     feeRow.hidden = !(delivery && fee > 0);
     var total = parseFloat(grand.dataset.base) + (delivery ? fee : 0);
     grand.textContent = grand.dataset.symbol + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   }
   radios.forEach(function (r) { r.addEventListener('change', update); });
+  picks.forEach(function (r) { r.addEventListener('change', update); });
   update();
 })();
 </script>

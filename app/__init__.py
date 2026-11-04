@@ -66,6 +66,25 @@ def create_app(config_object=None):
             return ""
         return (value + timedelta(hours=app.config["SHOP_UTC_OFFSET_HOURS"])).strftime(fmt)
 
+    SOCIAL_NETWORKS = (("facebook", "Facebook", "SOCIAL_FACEBOOK"),
+                       ("instagram", "Instagram", "SOCIAL_INSTAGRAM"),
+                       ("tiktok", "TikTok", "SOCIAL_TIKTOK"),
+                       ("x", "X", "SOCIAL_X"),
+                       ("youtube", "YouTube", "SOCIAL_YOUTUBE"),
+                       ("linkedin", "LinkedIn", "SOCIAL_LINKEDIN"))
+
+    def social_links():
+        """[(key, label, url)] for the footer. Only http(s) links are ever shown; WhatsApp comes from BUSINESS_WHATSAPP."""
+        links = []
+        for key, label, cfg in SOCIAL_NETWORKS:
+            url = (app.config.get(cfg) or "").strip()
+            if url.lower().startswith(("https://", "http://")):
+                links.append((key, label, url))
+        whatsapp = app.config.get("BUSINESS_WHATSAPP")
+        if whatsapp:
+            links.append(("whatsapp", "WhatsApp", f"https://wa.me/{whatsapp}"))
+        return links
+
     @app.context_processor
     def inject_globals():
         from flask import session
@@ -77,7 +96,7 @@ def create_app(config_object=None):
         nav_cats = []
         try:
             from flask import request as _rq
-            if _rq.blueprint == "shop":
+            if _rq.blueprint in ("shop", "auth", None):   # every customer-facing page (incl. error pages)
                 from .views.shop import nav_categories
                 nav_cats = nav_categories()
         except Exception:
@@ -93,6 +112,7 @@ def create_app(config_object=None):
                 "whatsapp": app.config["BUSINESS_WHATSAPP"],
             },
             "cart_count": sum(int(q) for q in cart.values()),
+            "socials": social_links(),
             "google_on": bool(app.config["GOOGLE_CLIENT_ID"] and app.config["GOOGLE_CLIENT_SECRET"]
                           and app.config["GOOGLE_REDIRECT_URI"]),
             "staff_pending_orders": pending,

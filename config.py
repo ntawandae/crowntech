@@ -60,6 +60,14 @@ class Config:
     # International format, digits only (e.g. 263771234567). Enables "Chat on WhatsApp" links.
     BUSINESS_WHATSAPP = os.environ.get("BUSINESS_WHATSAPP", "").replace("+", "").replace(" ", "")
 
+    # Social media pages shown in the shop footer (full https:// addresses). Empty = hidden.
+    SOCIAL_FACEBOOK = os.environ.get("SOCIAL_FACEBOOK", "").strip()
+    SOCIAL_INSTAGRAM = os.environ.get("SOCIAL_INSTAGRAM", "").strip()
+    SOCIAL_TIKTOK = os.environ.get("SOCIAL_TIKTOK", "").strip()
+    SOCIAL_X = os.environ.get("SOCIAL_X", "").strip()
+    SOCIAL_YOUTUBE = os.environ.get("SOCIAL_YOUTUBE", "").strip()
+    SOCIAL_LINKEDIN = os.environ.get("SOCIAL_LINKEDIN", "").strip()
+
     # --- shop ------------------------------------------------------------
     SHOP_UTC_OFFSET_HOURS = int(os.environ.get("SHOP_UTC_OFFSET_HOURS", "2"))  # Zimbabwe = UTC+2
     SHOP_CURRENCY = os.environ.get("SHOP_CURRENCY", "USD")
@@ -70,6 +78,10 @@ class Config:
     # How long stock is held for an unpaid order
     ONLINE_PAYMENT_HOLD_MINUTES = int(os.environ.get("ONLINE_PAYMENT_HOLD_MINUTES", "45"))
     PICKUP_HOLD_HOURS = int(os.environ.get("PICKUP_HOLD_HOURS", "48"))
+
+    # Double-entry guard: if a sale (same products and quantities), expense or income (same description and
+    # amount) was already recorded within this many minutes, ask before recording another. 0 = switched off.
+    DUPLICATE_WINDOW_MINUTES = int(os.environ.get("DUPLICATE_WINDOW_MINUTES", "10"))
 
     # Largest discount (% of subtotal) a cashier may give. 0 = no limit. Admins are never limited.
     CASHIER_MAX_DISCOUNT_PERCENT = float(os.environ.get("CASHIER_MAX_DISCOUNT_PERCENT", "0"))
@@ -96,8 +108,8 @@ class Config:
     EMAIL_LINK_MINUTES_RESET = int(os.environ.get("EMAIL_LINK_MINUTES_RESET", "60"))
 
     # --- Sign in with Google (customers only) ----------------------------------------
-    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
-    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
     # Full https callback URL, exactly as listed in Google Cloud Console, e.g.
     # https://www.crowntechhub.co.zw/account/google/callback
     GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "").strip()

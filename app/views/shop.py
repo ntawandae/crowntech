@@ -10,7 +10,7 @@ from flask import (Blueprint, abort, current_app, flash, redirect, render_templa
 from flask_login import current_user, login_required, login_user
 
 from .. import db
-from ..models import Order, Payment, Product, Sale, User
+from ..models import CustomerAddress, Order, Payment, Product, Sale, User
 from ..utils.timeutil import zim_now
 from ..security import (clear_failures, client_key, csrf_token, protect_blueprint, record_failure,
                         safe_next, throttled)
@@ -358,17 +358,34 @@ def checkout():
 
     cfg = current_app.config
     methods = available_payment_methods()
+    customer = current_user if current_user.is_authenticated and current_user.role == "customer" else None
+    saved = list(customer.addresses) if customer else []
+    default_addr = next((a for a in saved if a.is_default), saved[0] if saved else None)
     form = {
-        "name": getattr(current_user, "full_name", "") if current_user.is_authenticated and current_user.role == "customer" else "",
-        "email": current_user.username if current_user.is_authenticated and current_user.role == "customer" else "",
-        "phone": "", "address": "", "notes": "",
+        "name": (customer.full_name or "") if customer else "",
+        "email": customer.username if customer else "",
+        "phone": (customer.phone or "") if customer else "",
+        "address": "", "notes": "",
         "delivery": "pickup", "payment": methods[0][0] if methods else "",
+        # which saved address is selected ("new" = type a different one)
+        "address_choice": str(default_addr.id) if default_addr else "new",
+        "save_address": bool(customer),
     }
 
     if request.method == "POST":
         form.update({k: (request.form.get(k) or "").strip() for k in ("name", "email", "phone", "address", "notes")})
         form["delivery"] = request.form.get("delivery", "pickup")
         form["payment"] = request.form.get("payment", "")
+        form["address_choice"] = request.form.get("address_choice") or "new"
+        form["save_address"] = bool(request.form.get("save_address"))
+        chosen_saved = None
+        if form["delivery"] == "delivery" and customer and form["address_choice"] != "new":
+            # only ever one of this customer's own addresses
+            chosen_saved = next((a for a in saved if str(a.id) == form["address_choice"]), None)
+            if chosen_saved:
+                form["address"] = chosen_saved.full
+            else:
+                form["address_choice"] = "new"
         errors = []
         if len(form["name"]) < 2:
             errors.append("Enter your full name.")
@@ -397,6 +414,8 @@ def checkout():
                 flash(str(exc), "danger")
                 return redirect(url_for("shop.cart"))
             save_cart({})
+            if customer:
+                _remember_checkout_details(customer, form, saved, chosen_saved)
             if order.payment_method == "pay_at_shop":
                 notify_order(order, "received")
                 flash("Order placed. We're holding your items for you.", "success")
@@ -407,7 +426,37 @@ def checkout():
 
     delivery_fee = cfg["DELIVERY_FEE"]
     return render_template("shop/checkout.html", lines=lines, subtotal=subtotal, form=form, methods=methods,
-                           delivery_enabled=cfg["DELIVERY_ENABLED"], delivery_fee=delivery_fee)
+                           delivery_enabled=cfg["DELIVERY_ENABLED"], delivery_fee=delivery_fee,
+                           saved_addresses=saved, is_customer=bool(customer))
+
+
+def _remember_checkout_details(customer, form, saved, chosen_saved):
+    """After an order is placed: keep the phone number, and save a newly typed address if they ticked the box."""
+    try:
+        changed = False
+        if not customer.phone and form["phone"]:
+            customer.phone = form["phone"][:30]
+            changed = True
+        if form["delivery"] == "delivery" and not chosen_saved and form["save_address"] and form["address"]:
+            text = form["address"][:220]
+            if not any(a.full.lower() == text.lower() or a.address.lower() == text.lower() for a in saved):
+                db.session.add(CustomerAddress(user_id=customer.id, label=_next_label(saved), address=text,
+                                               is_default=not saved))
+                changed = True
+        if changed:
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Could not save checkout details to the customer's account")
+
+
+def _next_label(saved):
+    """First free label from Home / Work / Other, so new addresses don't all look the same."""
+    used = {a.label.lower() for a in saved}
+    for label in ("Home", "Work", "Other"):
+        if label.lower() not in used:
+            return label
+    return f"Address {len(saved) + 1}"
 
 
 # ----------------------------------------------------------------------
@@ -981,10 +1030,150 @@ def google_callback():
     )
 
 
+def customer_required(view):
+    """Account pages are for customers; staff who wander in are sent to their own area."""
+    from functools import wraps
+
+    @wraps(view)
+    @login_required
+    def wrapper(*args, **kwargs):
+        if current_user.role != "customer":
+            return redirect(home_for(current_user))
+        return view(*args, **kwargs)
+    return wrapper
+
+
+MAX_ADDRESSES = 10
+
+
 @shop_bp.route("/account")
-@login_required
+@customer_required
 def account():
-    if current_user.role != "customer":
-        return redirect(home_for(current_user))
     orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
-    return render_template("shop/account.html", orders=orders)
+    return render_template("shop/account.html", orders=orders, active="orders")
+
+
+@shop_bp.route("/account/profile", methods=["GET", "POST"])
+@customer_required
+def account_profile():
+    if request.method == "POST":
+        name = " ".join((request.form.get("name") or "").split())
+        phone = (request.form.get("phone") or "").strip()
+        if len(name) < 2 or len(name) > 100:
+            flash("Enter your full name.", "danger")
+        elif phone and len(re.sub(r"\D", "", phone)) < 7:
+            flash("Enter a phone number we can reach you on, or leave it empty.", "danger")
+        elif len(phone) > 30:
+            flash("That phone number is too long.", "danger")
+        else:
+            current_user.full_name = name
+            current_user.phone = phone or None
+            db.session.commit()
+            flash("Your details have been saved.", "success")
+            return redirect(url_for("shop.account_profile"))
+    return render_template("shop/account_profile.html", active="profile")
+
+
+@shop_bp.route("/account/password", methods=["POST"])
+@customer_required
+def account_password():
+    from werkzeug.security import check_password_hash, generate_password_hash
+    key = client_key(f"pw:{current_user.id}")
+    if throttled(key):
+        flash("Too many attempts. Please wait a few minutes and try again.", "danger")
+        return redirect(url_for("shop.account_profile"))
+    current, new, confirm = (request.form.get("current_password") or "", request.form.get("new_password") or "",
+                             request.form.get("confirm_password") or "")
+    if not check_password_hash(current_user.password, current):
+        record_failure(key)
+        flash("Your current password isn't right. Signed up with Google? Use \"Forgot your password?\" on the sign-in page to set one.", "danger")
+    elif len(new) < 8:
+        flash("Choose a new password with at least 8 characters.", "danger")
+    elif new != confirm:
+        flash("The two new passwords don't match.", "danger")
+    else:
+        current_user.password = generate_password_hash(new)
+        db.session.commit()
+        clear_failures(key)
+        flash("Password changed.", "success")
+    return redirect(url_for("shop.account_profile"))
+
+
+@shop_bp.route("/account/addresses")
+@customer_required
+def account_addresses():
+    addresses = list(current_user.addresses)
+    editing = None
+    edit_id = request.args.get("edit", type=int)
+    if edit_id:
+        editing = next((a for a in addresses if a.id == edit_id), None)
+    return render_template("shop/account_addresses.html", addresses=addresses, editing=editing, active="addresses",
+                           next_url=safe_next(request.args.get("next"), ""), max_addresses=MAX_ADDRESSES)
+
+
+@shop_bp.route("/account/addresses/save", methods=["POST"])
+@customer_required
+def account_address_save():
+    next_url = safe_next(request.form.get("next"), "")
+    back = url_for("shop.account_addresses", next=next_url or None)
+    addresses = list(current_user.addresses)
+    address_id = request.form.get("address_id", type=int)
+    label = " ".join((request.form.get("label") or "").split())[:40] or "Home"
+    line = " ".join((request.form.get("address") or "").split())
+    city = " ".join((request.form.get("city") or "").split())[:80]
+    make_default = bool(request.form.get("is_default"))
+
+    target = next((a for a in addresses if a.id == address_id), None) if address_id else None
+    if address_id and not target:
+        abort(404)
+    if len(line) < 5:
+        flash("Enter the street address, suburb or landmark so the driver can find you.", "danger")
+        return redirect(back)
+    if len(line) > 220:
+        flash("That address is too long. Please shorten it a little.", "danger")
+        return redirect(back)
+    if not target and len(addresses) >= MAX_ADDRESSES:
+        flash(f"You can save up to {MAX_ADDRESSES} addresses. Remove one to add another.", "warning")
+        return redirect(back)
+
+    if target is None:
+        target = CustomerAddress(user_id=current_user.id)
+        db.session.add(target)
+        make_default = make_default or not addresses      # the first address is always the default
+    target.label, target.address, target.city = label, line, city or None
+    if make_default:
+        for a in addresses:
+            a.is_default = False
+        target.is_default = True
+    db.session.commit()
+    flash("Address saved.", "success")
+    return redirect(next_url or url_for("shop.account_addresses"))
+
+
+@shop_bp.route("/account/addresses/<int:address_id>/default", methods=["POST"])
+@customer_required
+def account_address_default(address_id):
+    addresses = list(current_user.addresses)
+    target = next((a for a in addresses if a.id == address_id), None) or abort(404)
+    for a in addresses:
+        a.is_default = (a.id == target.id)
+    db.session.commit()
+    flash("Default address updated.", "success")
+    return redirect(url_for("shop.account_addresses"))
+
+
+@shop_bp.route("/account/addresses/<int:address_id>/delete", methods=["POST"])
+@customer_required
+def account_address_delete(address_id):
+    addresses = list(current_user.addresses)
+    target = next((a for a in addresses if a.id == address_id), None) or abort(404)
+    was_default = target.is_default
+    db.session.delete(target)
+    db.session.flush()
+    if was_default:
+        rest = [a for a in addresses if a.id != address_id]
+        if rest:
+            rest[0].is_default = True
+    db.session.commit()
+    flash("Address removed.", "info")
+    return redirect(url_for("shop.account_addresses"))

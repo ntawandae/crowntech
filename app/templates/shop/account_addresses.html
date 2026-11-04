@@ -1,0 +1,62 @@
+{% extends 'shop/base.html' %}
+{% block title %}Saved addresses | {{ biz.name }}{% endblock %}
+{% block content %}
+<div class="wrap page"><div class="acct-layout">
+  {% include 'shop/_account_nav.html' %}
+  <div class="acct-main">
+    <h1>Saved addresses</h1>
+    <p class="muted">Choose one of these when you pick delivery at checkout. You can still type a different address on the day.</p>
+
+    {% if addresses %}
+    <div class="addr-grid">
+      {% for a in addresses %}
+      <article class="addr {{ 'is-default' if a.is_default }}">
+        <div class="addr-top"><strong>{{ a.label }}</strong>{% if a.is_default %}<span class="badge badge-gold">Default</span>{% endif %}</div>
+        <address>{{ a.full }}</address>
+        <div class="actions">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('shop.account_addresses', edit=a.id, next=next_url or None) }}#address-form">Edit</a>
+          {% if not a.is_default %}
+          <form method="post" action="{{ url_for('shop.account_address_default', address_id=a.id) }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Make default</button>
+          </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('shop.account_address_delete', address_id=a.id) }}" onsubmit="return confirm('Remove this address?')">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn btn-danger btn-sm" type="submit">Remove</button>
+          </form>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if editing or addresses|length < max_addresses %}
+    <section class="panel" id="address-form">
+      <h2>{{ 'Edit address' if editing else ('Add an address' if addresses else 'Add your first address') }}</h2>
+      <form method="post" action="{{ url_for('shop.account_address_save') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        {% if editing %}<input type="hidden" name="address_id" value="{{ editing.id }}">{% endif %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <div class="grid-2">
+          <div class="field"><label for="label">Name this address</label><input id="label" name="label" value="{{ editing.label if editing else ('Home' if not addresses else '') }}" maxlength="40" placeholder="Home, Work, Mum's place"></div>
+          <div class="field"><label for="city">Town or city</label><input id="city" name="city" value="{{ (editing.city if editing else '') or '' }}" maxlength="80" autocomplete="address-level2" placeholder="Harare"></div>
+        </div>
+        <div class="field"><label for="address">Street address, suburb and landmarks</label>
+          <textarea id="address" name="address" maxlength="220" autocomplete="street-address" required placeholder="e.g. 12 Samora Machel Ave, Avondale, next to the Total garage">{{ editing.address if editing else '' }}</textarea></div>
+        {% if not editing or not editing.is_default %}
+        <div class="field"><label class="check"><input type="checkbox" name="is_default" value="1" {{ 'checked' if not addresses }}><span>Use this as my default delivery address</span></label></div>
+        {% endif %}
+        <div class="form-actions">
+          <button class="btn btn-gold" type="submit">Save address</button>
+          {% if editing %}<a class="btn btn-ghost" href="{{ url_for('shop.account_addresses', next=next_url or None) }}">Cancel</a>{% endif %}
+          {% if next_url %}<a class="link-btn" href="{{ next_url }}" style="text-decoration:none">Back to checkout</a>{% endif %}
+        </div>
+      </form>
+    </section>
+    {% else %}
+    <p class="muted">You've saved the most addresses we can keep ({{ max_addresses }}). Remove one to add another.</p>
+    {% endif %}
+  </div>
+</div></div>
+{% endblock %}

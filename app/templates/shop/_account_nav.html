@@ -1,0 +1,12 @@
+<aside class="acct-side">
+  <div class="acct-hello">
+    <span class="avatar">{{ (current_user.full_name or current_user.username)[:1]|upper }}</span>
+    <div><strong>{{ current_user.full_name or 'Your account' }}</strong><small>{{ current_user.username }}</small></div>
+  </div>
+  <nav aria-label="Your account">
+    <a href="{{ url_for('shop.account') }}" {% if active == 'orders' %}aria-current="page"{% endif %}><svg class="ic"><use href="#i-box"/></svg>Orders</a>
+    <a href="{{ url_for('shop.account_profile') }}" {% if active == 'profile' %}aria-current="page"{% endif %}><svg class="ic"><use href="#i-user"/></svg>My details</a>
+    <a href="{{ url_for('shop.account_addresses') }}" {% if active == 'addresses' %}aria-current="page"{% endif %}><svg class="ic"><use href="#i-pin"/></svg>Addresses</a>
+    <a href="{{ url_for('auth.logout') }}"><svg class="ic"><use href="#i-out"/></svg>Sign out</a>
+  </nav>
+</aside>

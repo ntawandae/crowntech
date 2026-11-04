@@ -16,6 +16,7 @@ from ..services.quotes import generate_quotation_number
 from ..utils.receipts import receipt_pdf, receipt_items, render_pdf, static_link_callback
 from ..utils.timeutil import ZIM_OFFSET, day_range, zim_now as _zim_now, zim_today as _zim_today
 import hashlib
+import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 # Define Blueprint
 cashier_bp = Blueprint('cashier', __name__, url_prefix='/cashier')
+
+# Records are checked for repeats and saved one at a time, so a double-click can't slip two copies through.
+_record_lock = threading.Lock()
 
 # Custom decorator for cashier-only access
 def cashier_required(f):
@@ -168,20 +172,38 @@ def _price_from_form(lines):
                           request.form.get('delivery_fee') or 0, limit)
 
 
+def _duplicate_sale_prompt(dup, lines, pricing):
+    """Ask the cashier to confirm before recording a sale that matches one made moments ago."""
+    receipt = dup["receipt"]
+    items = ", ".join(f"{l['qty']} x {l['product'].name.split('|')[0].strip()[:40]}" for l in lines)
+    details = [("Items", items),
+               ("Earlier sale", f"Receipt {receipt.receipt_number}, ${receipt.total:.2f}, recorded {dup['ago']} by {dup['who']}"),
+               ("This sale", f"${float(pricing['total']):.2f}")]
+    return pos.duplicate_prompt(
+        f"A sale with the same items was already recorded {dup['ago']}.", details,
+        "Record this sale anyway", url_for('cashier.cashier_dashboard'), "No, back to the till")
+
+
 def _process_sale(want_receipt):
     """Shared by 'Sell' and 'Sell & receipt'. The cart is only emptied once the sale is saved."""
     back = redirect(url_for('cashier.cashier_dashboard'))
+    confirmed = bool(request.form.get('confirm_duplicate'))
     try:
-        lines = _cart_lines()
-        if not lines:
-            flash("Cart is empty.", "warning")
-            return back
-        pricing = _price_from_form(lines)
-        result = pos.complete_sale(
-            lines, current_user, pricing,
-            customer={"name": request.form.get('customer_name'), "email": request.form.get('customer_email'),
-                      "phone": request.form.get('customer_phone')},
-            delivery_address=request.form.get('delivery_address'))
+        with _record_lock:
+            lines = _cart_lines()
+            if not lines:
+                flash("Cart is empty.", "warning")
+                return back
+            pricing = _price_from_form(lines)
+            if not confirmed:
+                dup = pos.find_recent_duplicate_sale(lines)
+                if dup:
+                    return _duplicate_sale_prompt(dup, lines, pricing)
+            result = pos.complete_sale(
+                lines, current_user, pricing,
+                customer={"name": request.form.get('customer_name'), "email": request.form.get('customer_email'),
+                          "phone": request.form.get('customer_phone')},
+                delivery_address=request.form.get('delivery_address'))
     except (PricingError, SaleError) as exc:
         flash(str(exc), "danger")
         return back
@@ -463,6 +485,15 @@ def edit_defect_request(request_id):
 # ----------------------------------------------------------------------
 # RECORD EXPENSE & INCOME – Use Zim time
 # ----------------------------------------------------------------------
+def _duplicate_entry_prompt(kind, description, amount, dup):
+    """Confirmation screen for an expense / extra income that matches one entered moments ago."""
+    details = [("Earlier entry", f"{dup['row'].description} - ${dup['row'].amount:.2f}, recorded {dup['ago']} by {dup['who']}"),
+               ("This entry", f"{description} - ${amount:.2f}")]
+    return pos.duplicate_prompt(
+        f"The same {kind} was already recorded {dup['ago']}.", details,
+        f"Record this {kind} anyway", url_for('cashier.cashier_dashboard'), "No, back to the till")
+
+
 @cashier_bp.route('/record_expense', methods=['POST'])
 @login_required
 @cashier_required
@@ -473,14 +504,19 @@ def record_expense():
         if not description or amount <= 0:
             flash("Please provide valid expense details.", "warning")
             return redirect(url_for('cashier.cashier_dashboard'))
-        expense = Expense(
-            description=description,
-            amount=amount,
-            recorded_by=current_user.id,
-            timestamp=get_zim_now()   # ← Zimbabwe time
-        )
-        db.session.add(expense)
-        db.session.commit()
+        with _record_lock:
+            if not request.form.get('confirm_duplicate'):
+                dup = pos.find_recent_duplicate_entry(Expense, description, amount)
+                if dup:
+                    return _duplicate_entry_prompt("expense", description, amount, dup)
+            expense = Expense(
+                description=description,
+                amount=amount,
+                recorded_by=current_user.id,
+                timestamp=get_zim_now()   # ← Zimbabwe time
+            )
+            db.session.add(expense)
+            db.session.commit()
         update_cash_balance(expense_amount=amount)
         flash("Expense recorded successfully.", "success")
         return redirect(url_for('cashier.cashier_dashboard'))
@@ -498,14 +534,19 @@ def record_income():
         if not description or amount <= 0:
             flash("Please provide valid income details.", "warning")
             return redirect(url_for('cashier.cashier_dashboard'))
-        income = ExtraIncome(
-            description=description,
-            amount=amount,
-            recorded_by=current_user.id,
-            timestamp=get_zim_now()   # ← Zimbabwe time
-        )
-        db.session.add(income)
-        db.session.commit()
+        with _record_lock:
+            if not request.form.get('confirm_duplicate'):
+                dup = pos.find_recent_duplicate_entry(ExtraIncome, description, amount)
+                if dup:
+                    return _duplicate_entry_prompt("income", description, amount, dup)
+            income = ExtraIncome(
+                description=description,
+                amount=amount,
+                recorded_by=current_user.id,
+                timestamp=get_zim_now()   # ← Zimbabwe time
+            )
+            db.session.add(income)
+            db.session.commit()
         update_cash_balance(income_amount=amount)
         flash("Extra income recorded successfully.", "success")
         return redirect(url_for('cashier.cashier_dashboard'))

@@ -13,6 +13,7 @@ class User(UserMixin, db.Model):
     email_verified = db.Column(db.Boolean, default=True)           # customers start False until they click the emailed link
     must_change_password = db.Column(db.Boolean, default=False)    # staff must pick their own password after an admin sets/resets it
     google_sub = db.Column(db.String(64), nullable=True, index=True)  # Google's id for the linked Google account
+    phone = db.Column(db.String(30), nullable=True)                   # customers: contact number used to pre-fill checkout
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -286,3 +287,24 @@ class AuthToken(db.Model):
     used_at = db.Column(db.DateTime)
 
     user = db.relationship("User", foreign_keys=[user_id])
+
+
+class CustomerAddress(db.Model):
+    """A delivery address saved on a customer's account (they can keep several; one is the default)."""
+    __tablename__ = "customer_address"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    label = db.Column(db.String(40), nullable=False, default="Home")   # Home / Work / anything they like
+    address = db.Column(db.String(220), nullable=False)                 # street, suburb, landmarks
+    city = db.Column(db.String(80))
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", backref=db.backref("addresses", cascade="all, delete-orphan",
+                                                        order_by="CustomerAddress.id"))
+
+    @property
+    def full(self):
+        """Single line used on orders and receipts (Order.delivery_address is one text column)."""
+        return ", ".join(part for part in (self.address, self.city) if part)
