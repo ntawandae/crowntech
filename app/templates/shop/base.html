@@ -24,6 +24,9 @@
   <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
   <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
@@ -62,7 +65,7 @@
       <span>{{ biz.name }}</span>
     </a>
     <form class="head-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
-      <input type="search" name="q" value="{{ q|default('') }}" placeholder="Search laptops, phones, accessories" aria-label="Search products">
+      <input type="search" name="q" value="{{ q|default('') }}" placeholder="Search products" aria-label="Search products">
       <button type="submit" aria-label="Search"><svg class="ic"><use href="#i-search"/></svg></button>
     </form>
     <nav class="head-nav" aria-label="Account and cart">
@@ -238,6 +241,9 @@
     <a href="{{ url_for('auth.login') }}">Staff sign in</a>
   </div>
 </footer>
+
+<button class="to-top" id="toTop" type="button" aria-label="Back to top"><svg class="ic"><use href="#i-up"/></svg></button>
+<script src="{{ url_for('static', filename='js/shop.js') }}" defer></script>
 
 <!-- Bottom tab bar (phones) -->
 <nav class="tabbar" aria-label="Quick navigation">

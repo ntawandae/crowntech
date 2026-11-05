@@ -5,8 +5,21 @@
 <div class="wrap">
   <div class="crumbs"><a href="{{ url_for('shop.catalog') }}">Shop</a> / <a href="{{ url_for('shop.catalog', category=p.category) }}">{{ p.category }}</a></div>
   <div class="product" data-tone="{{ p.tone }}">
-    <div class="product-media">
-      {% if p.image %}<img src="{{ p.image }}" alt="{{ p.title }}" width="1100" height="825">{% else %}<span class="noimg">{{ p.category }}</span>{% endif %}
+    <div class="gallery">
+      <div class="product-media gal-stage" {% if p.images|length > 1 %}tabindex="0" role="group" aria-roledescription="carousel" aria-label="Photos of {{ p.title }}"{% endif %}>
+        {% for src in p.images %}<img class="gal-img {{ 'on' if loop.first }}" src="{{ src }}" alt="{{ p.title }}{% if p.images|length > 1 %}, photo {{ loop.index }} of {{ p.images|length }}{% endif %}" width="1100" height="825" {% if not loop.first %}loading="lazy"{% endif %}>
+        {% else %}<span class="noimg">{{ p.category }}</span>{% endfor %}
+        {% if p.images|length > 1 %}
+        <button class="gal-nav prev" type="button" aria-label="Previous photo"><svg class="ic"><use href="#i-prev"/></svg></button>
+        <button class="gal-nav next" type="button" aria-label="Next photo"><svg class="ic"><use href="#i-next"/></svg></button>
+        <span class="gal-count" aria-hidden="true">1 / {{ p.images|length }}</span>
+        {% endif %}
+      </div>
+      {% if p.thumbs|length > 1 %}
+      <div class="gal-thumbs">
+        {% for t in p.thumbs %}<button class="gal-thumb {{ 'on' if loop.first }}" type="button" aria-label="Show photo {{ loop.index }} of {{ p.thumbs|length }}" aria-current="{{ 'true' if loop.first else 'false' }}"><img src="{{ t }}" alt="" loading="lazy" width="136" height="102"></button>{% endfor %}
+      </div>
+      {% endif %}
     </div>
     <div>
       <h1 style="font-size:clamp(1.6rem,3vw,2.2rem)">{{ p.title }}</h1>

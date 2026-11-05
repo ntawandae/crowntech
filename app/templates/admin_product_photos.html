@@ -1,0 +1,73 @@
+{% extends "staff/layout.html" %}
+{% block title %}Photos - {{ product.name }}{% endblock %}
+{% block head %}
+<style>
+  .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); gap: 14px; margin: 16px 0 22px; }
+  .ph-card { background: #fff; border: 1px solid var(--line, #dde3f0); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+  .ph-card.is-main { border-color: #f2b01e; box-shadow: 0 0 0 1px #f2b01e inset; }
+  .ph-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: #eef1f8; }
+  .ph-meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ph-label { font-weight: 700; font-size: .9rem; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .ph-tag { background: #fdf0d5; color: #8a5a00; border-radius: 999px; padding: 2px 9px; font-size: .74rem; font-weight: 700; }
+  .ph-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ph-actions form { margin: 0; }
+  .ph-actions button { min-height: 34px; padding: 6px 10px; font-size: .82rem; }
+  .ph-upload { background: #fff; border: 1px solid var(--line, #dde3f0); border-radius: 12px; padding: 18px; max-width: 560px; }
+  .ph-note { color: #54617a; font-size: .9rem; margin: 4px 0 0; }
+</style>
+{% endblock %}
+{% block content %}
+  <p><a href="{{ url_for('admin.admin_dashboard', view='products') }}">&larr; Back to products</a></p>
+  <h2>Photos: {{ product.name|truncate(80) }}</h2>
+  <p class="ph-note">The first photo is the main one. Customers see every photo as a gallery on the product page, and the product cards in the shop rotate through them.
+     {{ photos|length }} of {{ max_photos }} photos used.</p>
+
+  {% if photos %}
+  <div class="ph-grid">
+    {% for ph in photos %}
+    <div class="ph-card {{ 'is-main' if ph.main }}">
+      <img src="{{ url_for('shop.media', size='card', filename=ph.filename) }}" alt="Photo {{ loop.index }} of {{ product.name }}" loading="lazy">
+      <div class="ph-meta">
+        <div class="ph-label"><span>Photo {{ loop.index }}</span>{% if ph.main %}<span class="ph-tag">Main</span>{% endif %}</div>
+        <div class="ph-actions">
+          {% if not ph.main %}
+          <form method="POST" action="{{ url_for('admin.product_photo_make_main', product_id=product.id, photo_id=ph.id) }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit">Make main</button>
+          </form>
+          {% if not loop.first and not photos[loop.index0 - 1].main %}
+          <form method="POST" action="{{ url_for('admin.product_photo_move', product_id=product.id, photo_id=ph.id) }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="direction" value="left"><button type="submit" aria-label="Move earlier">&larr;</button>
+          </form>
+          {% endif %}
+          {% if not loop.last %}
+          <form method="POST" action="{{ url_for('admin.product_photo_move', product_id=product.id, photo_id=ph.id) }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="direction" value="right"><button type="submit" aria-label="Move later">&rarr;</button>
+          </form>
+          {% endif %}
+          {% endif %}
+          <form method="POST" action="{{ url_for('admin.product_photo_delete', product_id=product.id, photo_id=ph.id) }}" onsubmit="return confirm('Remove this photo?')">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="btn-danger">Remove</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="ph-note">This product has no photos yet.</p>
+  {% endif %}
+
+  {% if photos|length < max_photos %}
+  <div class="ph-upload">
+    <h3 style="margin-top:0">Add photos</h3>
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.product_photos_add', product_id=product.id) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="file" name="photos" accept="image/*" multiple required>
+      <p class="ph-note">You can choose several at once (JPG, PNG or WebP). Room for {{ max_photos - photos|length }} more.</p>
+      <div style="margin-top:12px"><button type="submit" class="btn btn-primary">Upload photos</button></div>
+    </form>
+  </div>
+  {% else %}
+  <p class="ph-note">This product has the maximum number of photos. Remove one to add another.</p>
+  {% endif %}
+{% endblock %}

@@ -285,6 +285,7 @@
                     <strong>{{ total_sold }}</strong>
                 </td>
                 <td>
+                    <a class="btn" href="{{ url_for('admin.product_photos', product_id=p.id) }}">Photos{% if p.extra_images %} ({{ p.extra_images|length + 1 }}){% endif %}</a>
                     <button class="btn edit-product-btn"
                             data-id="{{ p.id }}"
                             data-name="{{ p.name }}"
@@ -365,8 +366,10 @@
             <small id="new-cost-price-desc" class="form-text text-muted">Enter the cost price.</small>
             <input type="number" name="quantity" placeholder="Quantity" required aria-describedby="new-quantity-desc">
             <small id="new-quantity-desc" class="form-text text-muted">Enter the initial quantity.</small>
-            <input type="file" name="image" required aria-describedby="image-desc">
-            <small id="image-desc" class="form-text text-muted">Upload a product image.</small>
+            <input type="file" name="image" required accept="image/*" aria-describedby="image-desc">
+            <small id="image-desc" class="form-text text-muted">Main product photo (shown first).</small>
+            <input type="file" name="more_images" multiple accept="image/*" aria-describedby="more-images-desc">
+            <small id="more-images-desc" class="form-text text-muted">More photos (optional, up to 7). Customers see them all as a gallery. You can add or change photos later with the Photos button.</small>
             <button type="submit">Add Product</button>
         </form>
     </div>

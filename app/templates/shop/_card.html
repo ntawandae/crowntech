@@ -1,6 +1,6 @@
 {% macro product_card(p) %}
 <article class="card {{ 'is-out' if not p.in_stock }}" data-tone="{{ p.tone }}">
-  <a class="card-media" href="{{ url_for('shop.product', product_id=p.id) }}" tabindex="-1" aria-hidden="true">
+  <a class="card-media" href="{{ url_for('shop.product', product_id=p.id) }}" tabindex="-1" aria-hidden="true"{% if p.images|length > 1 %} data-images='{{ p.images|tojson }}'{% endif %}>
     {% if p.image %}<img src="{{ p.image }}" alt="" loading="lazy" width="640" height="480">{% else %}<span class="noimg">{{ p.category }}</span>{% endif %}
     {% if not p.in_stock %}<span class="cat-tag out">Out of stock</span>{% elif p.low_stock %}<span class="cat-tag low">{{ p.qty }} left</span>{% endif %}
   </a>

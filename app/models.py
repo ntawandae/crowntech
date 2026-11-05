@@ -33,6 +33,27 @@ class Product(db.Model):
     def profit_per_item(self):
         return round(self.price - self.cost_price, 2)
 
+    @property
+    def all_images(self):
+        """Every photo filename for this product: the main one first, then the extra ones in order."""
+        files = [self.image_filename] if self.image_filename else []
+        files += [img.filename for img in self.extra_images if img.filename]
+        return files
+
+
+class ProductImage(db.Model):
+    """An extra photo for a product (the main photo stays in Product.image_filename)."""
+    __tablename__ = "product_image"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=False, index=True)
+    filename = db.Column(db.String(255), nullable=False)
+    position = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    product = db.relationship("Product", backref=db.backref(
+        "extra_images", cascade="all, delete-orphan", order_by="(ProductImage.position, ProductImage.id)"))
+
 class Sale(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'))

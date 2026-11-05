@@ -8,9 +8,10 @@ from io import BytesIO
 from flask import (Blueprint, abort, current_app, flash, redirect, render_template,
                    request, send_file, session, url_for)
 from flask_login import current_user, login_required, login_user
+from sqlalchemy.orm import selectinload
 
 from .. import db
-from ..models import CustomerAddress, Order, Payment, Product, Sale, User
+from ..models import CustomerAddress, Order, Payment, Product, ProductImage, Sale, User
 from ..utils.timeutil import zim_now
 from ..security import (clear_failures, client_key, csrf_token, protect_blueprint, record_failure,
                         safe_next, throttled)
@@ -73,13 +74,18 @@ def sweep_expired():
             current_app.logger.exception("Could not release expired orders")
 
 
-def image_url(product, size="card"):
-    """Uniform 4:3 frame for a product photo (None if the photo file is missing)."""
-    if product.image_filename:
-        path = os.path.join(current_app.config["UPLOAD_FOLDER"], os.path.basename(product.image_filename))
-        if os.path.exists(path):
-            return url_for("shop.media", size=size, filename=os.path.basename(product.image_filename))
+def photo_url(filename, size="card"):
+    """Uniform 4:3 frame for one photo file (None if the file is missing)."""
+    if filename:
+        name = os.path.basename(filename)
+        if os.path.exists(os.path.join(current_app.config["UPLOAD_FOLDER"], name)):
+            return url_for("shop.media", size=size, filename=name)
     return None
+
+
+def image_url(product, size="card"):
+    """The product's main photo (None if the photo file is missing)."""
+    return photo_url(product.image_filename, size)
 
 
 def present(p, size="card"):
@@ -98,13 +104,16 @@ def present(p, size="card"):
         "in_stock": qty > 0,
         "low_stock": 0 < qty <= 2,
         "image": image_url(p, size),
+        # every photo that exists (main first): cards rotate through them, the product page shows a gallery
+        "images": [u for u in (photo_url(f, size) for f in p.all_images) if u],
+        "thumbs": [u for u in (photo_url(f, "card") for f in p.all_images) if u],
         "specs": extract_specs(p.name),
         "added": p.date_added,
     }
 
 
 def visible_products():
-    return Product.query.filter(Product.price > 0)
+    return Product.query.options(selectinload(Product.extra_images)).filter(Product.price > 0)
 
 
 def hot_products(limit=10, days=120):
@@ -117,7 +126,7 @@ def hot_products(limit=10, days=120):
             .order_by(db.func.sum(Sale.quantity).desc(), Sale.product_id)
             .limit(limit).all())
     ids = [r[0] for r in rows]
-    by_id = {p.id: p for p in Product.query.filter(Product.id.in_(ids or [0])).all()}
+    by_id = {p.id: p for p in Product.query.options(selectinload(Product.extra_images)).filter(Product.id.in_(ids or [0])).all()}
     ordered = [by_id[i] for i in ids if i in by_id]
     if len(ordered) < limit:
         extra = (visible_products().filter(Product.quantity > 0, ~Product.id.in_(ids or [0]))
@@ -165,7 +174,7 @@ def save_cart(cart):
 
 def cart_detail(cart):
     """Lines for the cart/checkout pages, with quantities clamped to live stock."""
-    products = {p.id: p for p in Product.query.filter(Product.id.in_(list(cart) or [0])).all()}
+    products = {p.id: p for p in Product.query.options(selectinload(Product.extra_images)).filter(Product.id.in_(list(cart) or [0])).all()}
     lines, subtotal, changed = [], 0.0, False
     for pid, qty in cart.items():
         p = products.get(pid)

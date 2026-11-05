@@ -102,7 +102,7 @@ logger.addHandler(handler)
 # ----------------------------------------------------------------------
 from ..models import (
     db, Product, Sale, Expense, DefectRequests, StockRequest, User, UserProfile,
-    Quotation, QuotationItem, Receipt, ExtraIncome, DailyCashBalance, SaleReversal
+    Quotation, QuotationItem, Receipt, ExtraIncome, DailyCashBalance, SaleReversal, ProductImage
 )
 from app.utils.pdf_generator import generate_quotation_number, generate_pdf
 
@@ -418,6 +418,13 @@ def add_stock():
             db.session.add(new_product)
             db.session.commit()
             flash(f"New product '{name}' added with {quantity} in stock.", "success")
+            more = [f for f in request.files.getlist('more_images') if f and f.filename]
+            if more:
+                added, problems = _add_extra_photos(new_product, more)
+                if added:
+                    flash(f"{added} extra photo{'s' if added != 1 else ''} added.", "success")
+                for msg in problems:
+                    flash(msg, "warning")
             return redirect(url_for('admin.add_stock'))
 
     products = Product.query.order_by(Product.name).all()
@@ -466,12 +473,11 @@ def delete_product(product_id):
         return redirect(url_for('admin.admin_dashboard', view='products'))
 
     try:
-        if product.image_filename:
-            image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image_filename)
-            if os.path.exists(image_path):
-                os.remove(image_path)
+        photo_files = list(product.all_images)
         db.session.delete(product)
         db.session.commit()
+        for fn in photo_files:
+            _remove_photo_file(fn)
         flash(f"Product '{product.name}' deleted successfully.", "success")
     except Exception as e:
         db.session.rollback()
@@ -479,6 +485,172 @@ def delete_product(product_id):
         logger.error(f"Error deleting product ID {product_id}: {str(e)}")
 
     return redirect(url_for('admin.admin_dashboard', view='products'))
+
+# ----------------------------------------------------------------------
+# Product photos (several per product: the shop shows them as a gallery and rotates them on cards)
+# ----------------------------------------------------------------------
+PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
+MAX_PRODUCT_PHOTOS = 8        # per product, including the main photo
+
+
+def _save_photo(storage, tag):
+    """Check and store one uploaded photo under a unique name. Returns the filename or raises ValueError."""
+    from PIL import Image
+    original = storage.filename or "photo"
+    safe = secure_filename(original)
+    ext = safe.rsplit(".", 1)[-1].lower() if "." in safe else ""
+    if ext not in PHOTO_EXTENSIONS:
+        raise ValueError(f"'{original}' isn't a photo file. Use JPG, PNG or WebP.")
+    try:
+        storage.stream.seek(0)
+        with Image.open(storage.stream) as im:
+            im.verify()
+        storage.stream.seek(0)
+    except Exception:
+        raise ValueError(f"'{original}' couldn't be read as a photo.")
+    folder = current_app.config['UPLOAD_FOLDER']
+    os.makedirs(folder, exist_ok=True)
+    filename = f"p{tag}_{secrets.token_hex(5)}.{ext}"
+    storage.save(os.path.join(folder, filename))
+    return filename
+
+
+def _remove_photo_file(filename):
+    """Delete a photo (and its cached shop thumbnails) once nothing refers to it any more."""
+    if not filename:
+        return
+    if Product.query.filter_by(image_filename=filename).count() or ProductImage.query.filter_by(filename=filename).count():
+        return
+    name = os.path.basename(filename)
+    paths = [os.path.join(current_app.config['UPLOAD_FOLDER'], name)]
+    stem = os.path.splitext(name)[0]
+    for size in ("card", "large"):
+        paths.append(os.path.join(current_app.instance_path, "thumbs", size, stem + ".jpg"))
+    for path in paths:
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+        except OSError:
+            logger.warning("Could not remove %s", path)
+
+
+def _add_extra_photos(product, files):
+    """Add uploaded files as extra photos. Returns (how many were added, [problem messages])."""
+    added, problems = 0, []
+    used = len(product.all_images)
+    position = max([img.position for img in product.extra_images] + [-1]) + 1
+    for storage in files:
+        if used >= MAX_PRODUCT_PHOTOS:
+            problems.append(f"A product can have up to {MAX_PRODUCT_PHOTOS} photos, so the rest were skipped.")
+            break
+        try:
+            filename = _save_photo(storage, product.id)
+        except ValueError as exc:
+            problems.append(str(exc))
+            continue
+        if not product.image_filename:
+            product.image_filename = filename            # a product with no photo yet: the first one becomes the main photo
+        else:
+            db.session.add(ProductImage(product_id=product.id, filename=filename, position=position))
+            position += 1
+        used += 1
+        added += 1
+    db.session.commit()
+    return added, problems
+
+
+def _photo_admin(product_id):
+    if current_user.role != 'admin':
+        abort(403)
+    return Product.query.get_or_404(product_id)
+
+
+@admin_bp.route('/product/<int:product_id>/photos')
+@login_required
+def product_photos(product_id):
+    product = _photo_admin(product_id)
+    photos = []
+    if product.image_filename:
+        photos.append({"id": 0, "filename": product.image_filename, "main": True})
+    photos += [{"id": img.id, "filename": img.filename, "main": False} for img in product.extra_images]
+    return render_template('admin_product_photos.html', product=product, photos=photos, max_photos=MAX_PRODUCT_PHOTOS)
+
+
+@admin_bp.route('/product/<int:product_id>/photos/add', methods=['POST'])
+@login_required
+def product_photos_add(product_id):
+    product = _photo_admin(product_id)
+    from ..security import verify_csrf
+    verify_csrf()
+    files = [f for f in request.files.getlist('photos') if f and f.filename]
+    if not files:
+        flash("Choose one or more photos first.", "warning")
+    else:
+        added, problems = _add_extra_photos(product, files)
+        if added:
+            flash(f"{added} photo{'s' if added != 1 else ''} added.", "success")
+        for msg in problems:
+            flash(msg, "warning")
+    return redirect(url_for('admin.product_photos', product_id=product.id))
+
+
+@admin_bp.route('/product/<int:product_id>/photos/<int:photo_id>/main', methods=['POST'])
+@login_required
+def product_photo_make_main(product_id, photo_id):
+    product = _photo_admin(product_id)
+    from ..security import verify_csrf
+    verify_csrf()
+    img = ProductImage.query.filter_by(id=photo_id, product_id=product.id).first_or_404()
+    product.image_filename, img.filename = img.filename, product.image_filename     # swap: old main takes its place
+    if not img.filename:
+        db.session.delete(img)
+    db.session.commit()
+    flash("Main photo changed.", "success")
+    return redirect(url_for('admin.product_photos', product_id=product.id))
+
+
+@admin_bp.route('/product/<int:product_id>/photos/<int:photo_id>/move', methods=['POST'])
+@login_required
+def product_photo_move(product_id, photo_id):
+    product = _photo_admin(product_id)
+    from ..security import verify_csrf
+    verify_csrf()
+    extras = list(product.extra_images)
+    index = next((i for i, img in enumerate(extras) if img.id == photo_id), None)
+    if index is None:
+        abort(404)
+    target = index - 1 if request.form.get('direction') == 'left' else index + 1
+    if 0 <= target < len(extras):
+        extras[index], extras[target] = extras[target], extras[index]
+    for pos, img in enumerate(extras):
+        img.position = pos
+    db.session.commit()
+    return redirect(url_for('admin.product_photos', product_id=product.id))
+
+
+@admin_bp.route('/product/<int:product_id>/photos/<int:photo_id>/delete', methods=['POST'])
+@login_required
+def product_photo_delete(product_id, photo_id):
+    product = _photo_admin(product_id)
+    from ..security import verify_csrf
+    verify_csrf()
+    if photo_id == 0:                                      # the main photo: the next one takes over
+        extras = list(product.extra_images)
+        if not extras:
+            flash("This is the only photo. Add another one first, then remove this one.", "warning")
+            return redirect(url_for('admin.product_photos', product_id=product.id))
+        old = product.image_filename
+        product.image_filename = extras[0].filename
+        db.session.delete(extras[0])
+    else:
+        img = ProductImage.query.filter_by(id=photo_id, product_id=product.id).first_or_404()
+        old = img.filename
+        db.session.delete(img)
+    db.session.commit()
+    _remove_photo_file(old)
+    flash("Photo removed.", "info")
+    return redirect(url_for('admin.product_photos', product_id=product.id))
+
 
 @admin_bp.route('/edit_product/<int:product_id>', methods=['POST'])
 @login_required
