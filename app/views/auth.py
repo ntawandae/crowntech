@@ -2,9 +2,11 @@ from flask import abort, current_app, send_file, Blueprint, render_template, red
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from ..models import User, UserProfile
+from ..services import storage as cloud
 from .. import db
 from ..security import verify_csrf, clear_failures, client_key, record_failure, safe_next, throttled
 from werkzeug.utils import secure_filename
+import mimetypes
 import secrets
 import os
 from datetime import datetime  # Added for date parsing
@@ -127,9 +129,19 @@ def profile():
                 if ext not in CONTRACT_EXTENSIONS:
                     flash("Contracts must be a PDF, image or Word document.", "danger")
                     return redirect(url_for("auth.profile"))
-                os.makedirs(contracts_dir(), exist_ok=True)
                 filename = f"{current_user.id}_{secrets.token_hex(6)}{ext}"
-                file.save(os.path.join(contracts_dir(), filename))
+                if cloud.enabled():
+                    try:
+                        cloud.ensure_buckets()
+                        cloud.upload(cloud.bucket_docs(), contract_key(filename), file.read(),
+                                     mimetypes.guess_type(filename)[0] or "application/octet-stream", cache_seconds=0)
+                    except cloud.StorageError as exc:
+                        current_app.logger.error("Contract upload failed: %s", exc)
+                        flash("We couldn't save the contract just now. Please try again in a moment.", "danger")
+                        return redirect(url_for("auth.profile"))
+                else:
+                    os.makedirs(contracts_dir(), exist_ok=True)
+                    file.save(os.path.join(contracts_dir(), filename))
                 remove_contract_file(profile.contract_file)   # replace, don't pile up old copies
                 profile.contract_file = filename
 
@@ -153,12 +165,22 @@ def contracts_dir():
     return os.path.join(current_app.instance_path, "contracts")
 
 
+def contract_key(stored_name):
+    """Where a contract lives inside the private Supabase bucket."""
+    return f"contracts/{os.path.basename(stored_name)}"
+
+
 def remove_contract_file(stored_name):
     if not stored_name:
         return
     path = os.path.join(contracts_dir(), os.path.basename(stored_name))
     if os.path.isfile(path):
         os.remove(path)
+    if cloud.enabled():
+        try:
+            cloud.delete(cloud.bucket_docs(), [contract_key(stored_name)])
+        except cloud.StorageError as exc:
+            current_app.logger.warning("Could not remove contract from cloud storage: %s", exc)
 
 
 @auth_bp.route("/contract/<int:user_id>")
@@ -171,9 +193,14 @@ def contract(user_id):
     if not profile.contract_file:
         abort(404)
     path = os.path.join(contracts_dir(), os.path.basename(profile.contract_file))
-    if not os.path.isfile(path):
-        abort(404)
-    return send_file(path, as_attachment=False)
+    if os.path.isfile(path):                      # older contracts still on this server's disk
+        return send_file(path, as_attachment=False)
+    if cloud.enabled():                           # private bucket: hand out a link that works for one minute
+        try:
+            return redirect(cloud.signed_url(cloud.bucket_docs(), contract_key(profile.contract_file), expires=60))
+        except cloud.StorageError as exc:
+            current_app.logger.error("Contract link failed: %s", exc)
+    abort(404)
 
 
 @auth_bp.route("/change-password", methods=["GET", "POST"])

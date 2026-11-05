@@ -31,6 +31,14 @@ def build_frame(src_path, size):
         return backdrop
 
 
+def frame_bytes(src, size):
+    """The finished frame as JPEG bytes (src: a path or an open file). Used when photos go to cloud storage."""
+    import io
+    buf = io.BytesIO()
+    build_frame(src, size).save(buf, "JPEG", quality=QUALITY, optimize=True, progressive=True)
+    return buf.getvalue()
+
+
 def get_frame_path(upload_dir, cache_dir, size, filename):
     """Return the path of the cached frame, building it first if needed. None if the source is missing."""
     if size not in SIZES:

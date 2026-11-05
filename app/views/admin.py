@@ -17,6 +17,8 @@ import secrets
 from werkzeug.security import generate_password_hash
 from .. import login_manager
 from ..services import pos, quotes
+from ..services import photos as photo_svc
+from ..services import storage as cloud
 from ..services.pos import PricingError, SaleError
 from ..utils.receipts import receipt_items, receipt_pdf, render_pdf, static_link_callback
 from ..utils.timeutil import day_range, zim_now, zim_today
@@ -401,10 +403,11 @@ def add_stock():
                 flash('Please provide valid product details and image.', 'danger')
                 return redirect(url_for('admin.add_stock'))
 
-            filename = secure_filename(image.filename)
-            image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-            os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
-            image.save(image_path)
+            try:
+                filename = _save_photo(image, "new")
+            except ValueError as exc:
+                flash(str(exc), "danger")
+                return redirect(url_for('admin.add_stock'))
 
             new_product = Product(
                 name=name,
@@ -493,45 +496,38 @@ PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 MAX_PRODUCT_PHOTOS = 8        # per product, including the main photo
 
 
-def _save_photo(storage, tag):
-    """Check and store one uploaded photo under a unique name. Returns the filename or raises ValueError."""
+def _save_photo(upload, tag):
+    """Check one uploaded photo and store it under a unique name (Supabase Storage, or the local disk if that
+    isn't set up). Returns the filename or raises ValueError with a message that can be shown to the admin."""
     from PIL import Image
-    original = storage.filename or "photo"
+    original = upload.filename or "photo"
     safe = secure_filename(original)
     ext = safe.rsplit(".", 1)[-1].lower() if "." in safe else ""
     if ext not in PHOTO_EXTENSIONS:
         raise ValueError(f"'{original}' isn't a photo file. Use JPG, PNG or WebP.")
     try:
-        storage.stream.seek(0)
-        with Image.open(storage.stream) as im:
+        upload.stream.seek(0)
+        with Image.open(upload.stream) as im:
             im.verify()
-        storage.stream.seek(0)
+        upload.stream.seek(0)
     except Exception:
         raise ValueError(f"'{original}' couldn't be read as a photo.")
-    folder = current_app.config['UPLOAD_FOLDER']
-    os.makedirs(folder, exist_ok=True)
     filename = f"p{tag}_{secrets.token_hex(5)}.{ext}"
-    storage.save(os.path.join(folder, filename))
+    try:
+        photo_svc.store_product_photo(upload.stream, filename)
+    except cloud.StorageError as exc:
+        logger.error("Photo upload failed: %s", exc)
+        raise ValueError(f"'{original}' couldn't be saved to cloud storage. Please try again in a moment.")
     return filename
 
 
 def _remove_photo_file(filename):
-    """Delete a photo (and its cached shop thumbnails) once nothing refers to it any more."""
+    """Delete a photo (and its cached frames / cloud copies) once nothing refers to it any more."""
     if not filename:
         return
     if Product.query.filter_by(image_filename=filename).count() or ProductImage.query.filter_by(filename=filename).count():
         return
-    name = os.path.basename(filename)
-    paths = [os.path.join(current_app.config['UPLOAD_FOLDER'], name)]
-    stem = os.path.splitext(name)[0]
-    for size in ("card", "large"):
-        paths.append(os.path.join(current_app.instance_path, "thumbs", size, stem + ".jpg"))
-    for path in paths:
-        try:
-            if os.path.isfile(path):
-                os.remove(path)
-        except OSError:
-            logger.warning("Could not remove %s", path)
+    photo_svc.remove_product_photo(filename)
 
 
 def _add_extra_photos(product, files):
@@ -1019,19 +1015,12 @@ def download_catalog():
     try:
         products = Product.query.all()
         for product in products:
-            try:
-                if product.image_filename and product.image_filename.strip():
-                    image_path = os.path.join(current_app.root_path, 'static', 'Uploads', product.image_filename.strip())
-                    if os.path.exists(image_path):
-                        product.image_path = image_path
-                    else:
-                        product.image_path = None
-                        flash(f"Image file not found for product {product.name}: {product.image_filename}", "warning")
-                else:
-                    product.image_path = None
-            except AttributeError:
-                product.image_path = None
-                flash(f"Invalid image filename for product {product.name}", "warning")
+            product.image_path = None
+            name = (product.image_filename or "").strip()
+            if name:
+                product.image_path = photo_svc.card_file(name)     # local file, or fetched from Supabase Storage
+                if not product.image_path:
+                    flash(f"Image file not found for product {product.name}: {name}", "warning")
 
         pdf = generate_pdf('catalog.html', {
             'products': products,
@@ -1061,19 +1050,12 @@ def download_stock_list():
     try:
         products = Product.query.order_by(Product.quantity.desc()).all()
         for product in products:
-            try:
-                if product.image_filename and product.image_filename.strip():
-                    image_path = os.path.join(current_app.root_path, 'static', 'Uploads', product.image_filename.strip())
-                    if os.path.exists(image_path):
-                        product.image_path = image_path
-                    else:
-                        product.image_path = None
-                        flash(f"Image file not found for product {product.name}: {product.image_filename}", "warning")
-                else:
-                    product.image_path = None
-            except AttributeError:
-                product.image_path = None
-                flash(f"Invalid image filename for product {product.name}", "warning")
+            product.image_path = None
+            name = (product.image_filename or "").strip()
+            if name:
+                product.image_path = photo_svc.card_file(name)     # local file, or fetched from Supabase Storage
+                if not product.image_path:
+                    flash(f"Image file not found for product {product.name}: {name}", "warning")
 
         pdf = generate_pdf('stock_list.html', {
             'products': products,

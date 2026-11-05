@@ -7,7 +7,7 @@
   <div class="product" data-tone="{{ p.tone }}">
     <div class="gallery">
       <div class="product-media gal-stage" {% if p.images|length > 1 %}tabindex="0" role="group" aria-roledescription="carousel" aria-label="Photos of {{ p.title }}"{% endif %}>
-        {% for src in p.images %}<img class="gal-img {{ 'on' if loop.first }}" src="{{ src }}" alt="{{ p.title }}{% if p.images|length > 1 %}, photo {{ loop.index }} of {{ p.images|length }}{% endif %}" width="1100" height="825" {% if not loop.first %}loading="lazy"{% endif %}>
+        {% for src in p.images %}<img class="gal-img {{ 'on' if loop.first }}" src="{{ src }}" alt="{{ p.title }}{% if p.images|length > 1 %}, photo {{ loop.index }} of {{ p.images|length }}{% endif %}" width="1100" height="825" {% if not loop.first %}loading="lazy"{% endif %} onerror="this.style.visibility='hidden'">
         {% else %}<span class="noimg">{{ p.category }}</span>{% endfor %}
         {% if p.images|length > 1 %}
         <button class="gal-nav prev" type="button" aria-label="Previous photo"><svg class="ic"><use href="#i-prev"/></svg></button>

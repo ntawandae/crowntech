@@ -27,6 +27,9 @@ def create_app(config_object=None):
     db.init_app(app)
     login_manager.init_app(app)
 
+    from .services.photos import photo_src
+    app.jinja_env.globals["photo_src"] = photo_src      # {{ photo_src(filename, 'card') }} in any template
+
     from .models import User
 
     @login_manager.user_loader

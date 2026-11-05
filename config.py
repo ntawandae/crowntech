@@ -60,6 +60,13 @@ class Config:
     # International format, digits only (e.g. 263771234567). Enables "Chat on WhatsApp" links.
     BUSINESS_WHATSAPP = os.environ.get("BUSINESS_WHATSAPP", "").replace("+", "").replace(" ", "")
 
+    # Supabase Storage for uploaded files (product photos + staff contracts). Without these two the app
+    # keeps files on the local disk, which Render wipes on every deploy.
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    SUPABASE_PRODUCT_BUCKET = os.environ.get("SUPABASE_PRODUCT_BUCKET", "product-images").strip()
+    SUPABASE_DOCS_BUCKET = os.environ.get("SUPABASE_DOCS_BUCKET", "staff-documents").strip()
+
     # Social media pages shown in the shop footer (full https:// addresses). Empty = hidden.
     SOCIAL_FACEBOOK = os.environ.get("SOCIAL_FACEBOOK", "").strip()
     SOCIAL_INSTAGRAM = os.environ.get("SOCIAL_INSTAGRAM", "").strip()

@@ -268,8 +268,8 @@
             {% for p in products %}
             <tr id="product-{{ p.id }}">
                 <td>
-                    {% if p.image_filename %}
-                    <img src="{{ url_for('static', filename='uploads/' + p.image_filename) }}" alt="{{ p.name }}" class="product-img">
+                    {% if p.image_filename and photo_src(p.image_filename) %}
+                    <img src="{{ photo_src(p.image_filename) }}" alt="{{ p.name }}" class="product-img" onerror="this.style.visibility='hidden'">
                     {% else %}
                     <div class="product-img placeholder">No Image</div>
                     {% endif %}

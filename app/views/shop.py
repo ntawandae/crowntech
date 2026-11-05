@@ -16,6 +16,7 @@ from ..utils.timeutil import zim_now
 from ..security import (clear_failures, client_key, csrf_token, protect_blueprint, record_failure,
                         safe_next, throttled)
 from ..services import orders as order_svc
+from ..services.photos import photo_src
 from ..services.orders import OrderError
 from ..services.paynow import PaynowClient, PaynowError, is_failed, is_paid, parse_message, verify_pairs
 from ..services.paypal import PayPalClient, PayPalError
@@ -75,12 +76,8 @@ def sweep_expired():
 
 
 def photo_url(filename, size="card"):
-    """Uniform 4:3 frame for one photo file (None if the file is missing)."""
-    if filename:
-        name = os.path.basename(filename)
-        if os.path.exists(os.path.join(current_app.config["UPLOAD_FOLDER"], name)):
-            return url_for("shop.media", size=size, filename=name)
-    return None
+    """Uniform 4:3 frame for one photo: from the local disk (older photos) or Supabase Storage. None if not found."""
+    return photo_src(filename, size)
 
 
 def image_url(product, size="card"):
