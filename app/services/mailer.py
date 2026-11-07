@@ -23,16 +23,27 @@ def _clean_header(value):
     return " ".join(str(value or "").split())
 
 
-def build_message(cfg, to, subject, text, html=None):
+def build_message(cfg, to, subject, text, html=None, attachments=None):
+    """attachments: [(filename, bytes, "type/subtype")] - only SMTP and the development outbox can carry them."""
     msg = EmailMessage()
     msg["Subject"] = _clean_header(subject)[:200]
     msg["From"] = formataddr((_clean_header(cfg["MAIL_FROM_NAME"]), _clean_header(cfg["MAIL_FROM"])))
     msg["To"] = _clean_header(to)
     msg["Message-ID"] = make_msgid(domain=_clean_header(cfg["MAIL_FROM"]).split("@")[-1] or None)
+    if cfg.get("BUSINESS_EMAIL"):
+        msg["Reply-To"] = _clean_header(cfg["BUSINESS_EMAIL"])
     msg.set_content(text)
     if html:
         msg.add_alternative(html, subtype="html")
+    for filename, data, mimetype in (attachments or []):
+        maintype, _, subtype = (mimetype or "application/octet-stream").partition("/")
+        msg.add_attachment(data, maintype=maintype, subtype=subtype or "octet-stream", filename=_clean_header(filename))
     return msg
+
+
+def supports_attachments(cfg):
+    """Alibaba's HTTPS mail API (SingleSendMail) cannot carry attachments; SMTP and the dev outbox can."""
+    return backend_name(cfg) != "aliyun_api"
 
 
 def backend_name(cfg):
@@ -150,14 +161,14 @@ def _deliver_console(instance_path, msg):
           f"{body.get_content() if body else ''}\n---------------------------------------------------\n")
 
 
-def send_email(to, subject, text, html=None):
+def send_email(to, subject, text, html=None, attachments=None):
     """Queue an email. Returns immediately."""
     from flask import current_app
     app = current_app._get_current_object()
     cfg = dict(app.config)
     if not to or "@" not in to:
         return
-    msg = build_message(cfg, to, subject, text, html)
+    msg = build_message(cfg, to, subject, text, html, attachments)
 
     def job():
         try:
@@ -188,6 +199,7 @@ def send_template(to, subject, template, **ctx):
     ctx.setdefault("biz_address", current_app.config["BUSINESS_ADDRESS"])
     ctx.setdefault("biz_phone", current_app.config["BUSINESS_PHONE"])
     ctx.setdefault("biz_whatsapp", current_app.config["BUSINESS_WHATSAPP"])
+    ctx.setdefault("biz_email", current_app.config.get("BUSINESS_EMAIL", ""))
     send_email(to, subject, render_template(f"email/{template}.txt", **ctx),
                render_template(f"email/{template}.html", **ctx))
 
@@ -212,3 +224,25 @@ def send_email_sync(to, subject, text, html=None):
         log.warning("Test email failed: %s", exc)
         return False, friendly_smtp_error(exc, cfg)
     return True, f"Sent to {to} through {'Alibaba Direct Mail (API)' if backend == 'aliyun_api' else 'SMTP'}. Check the inbox and the spam folder."
+
+
+def send_email_now(to, subject, text, html=None, attachments=None):
+    """Send right now and report the outcome as (ok, message). Used when a person clicked "Email to client"."""
+    from flask import current_app
+    cfg = dict(current_app.config)
+    if not to or "@" not in to:
+        return False, "Enter a valid email address."
+    backend = backend_name(cfg)
+    msg = build_message(cfg, to, subject, text, html, attachments)
+    if backend == "console":
+        _deliver_console(current_app.instance_path, msg)
+        return True, "No email service is configured, so nothing was really sent. A copy was saved in instance/outbox/."
+    try:
+        if backend == "aliyun_api":
+            _deliver_aliyun(cfg, to, subject, text, html)
+        else:
+            _deliver_smtp(cfg, msg)
+    except Exception as exc:
+        log.warning("Email to %s failed: %s", to, exc)
+        return False, friendly_smtp_error(exc, cfg)
+    return True, f"Sent to {to}."

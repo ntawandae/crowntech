@@ -10,10 +10,11 @@ from xhtml2pdf import pisa
 from ..models import Product, Sale, db, StockRequest, DefectRequests, Expense, QuotationItem, Quotation, Receipt, ExtraIncome, DailyCashBalance
 from sqlalchemy import func
 from flask import current_app
-from ..services import pos, quotes
+from ..services import documents, pos, quotes
+from ..security import safe_next
 from ..services.pos import PricingError, SaleError
 from ..services.quotes import generate_quotation_number
-from ..utils.receipts import receipt_pdf, receipt_items, render_pdf, static_link_callback
+from ..utils.receipts import receipt_pdf, receipt_items, render_pdf, static_link_callback, quotation_pdf
 from ..utils.timeutil import ZIM_OFFSET, day_range, zim_now as _zim_now, zim_today as _zim_today
 import hashlib
 import threading
@@ -218,6 +219,9 @@ def _process_sale(want_receipt):
     session.modified = True
     receipt = result['receipt']
     summary = f"Sale completed. Receipt #{receipt.receipt_number} - total ${receipt.total:.2f}."
+    emailed = documents.auto_email_receipt(receipt)          # only if the customer's email was entered
+    if emailed:
+        flash(emailed, "success")
     if not want_receipt:
         flash(summary, "success")
         return back
@@ -270,6 +274,9 @@ def convert_quotation(quotation_id):
 
     receipt = result['receipt']
     flash(f"Quotation {quotation.quotation_number} converted. Receipt #{receipt.receipt_number} recorded.", "success")
+    emailed = documents.auto_email_receipt(receipt)
+    if emailed:
+        flash(emailed, "success")
     pdf = receipt_pdf(receipt, result['items'], current_user.full_name)
     if pdf is None:
         flash("The receipt PDF could not be created: reprint it from Reports.", "warning")
@@ -685,8 +692,16 @@ def quotations():
         try:
             customer, items, discount = quotes.parse_quote_form(
                 request.form, current_app.config['CASHIER_MAX_DISCOUNT_PERCENT'])
-            q = quotes.save_quotation(current_user, customer, items, discount)
+            email, phone = quotes.parse_contact(request.form)
+            q = quotes.save_quotation(current_user, customer, items, discount, email=email, phone=phone)
             flash(f"Quotation {q.quotation_number} created.", "success")
+            if request.form.get('email_now'):
+                if not email:
+                    flash("Add the customer's email address to send the quotation.", "warning")
+                else:
+                    ok, msg = documents.email_quotation(q, email, current_user)
+                    flash(f"Quotation {q.quotation_number}: {msg}" if ok else f"The quotation was saved, but it could not be emailed. {msg}",
+                          "success" if ok else "warning")
         except PricingError as exc:
             flash(str(exc), "danger")
         except Exception:
@@ -706,16 +721,38 @@ def download_quotation(quotation_id):
     quotation = Quotation.query.get_or_404(quotation_id)
     if quotation.created_by_id != current_user.id:
         abort(403)
-    pdf = render_pdf('print_quotation.html', quotation=quotation,
-                     business_name=current_app.config['BUSINESS_NAME'],
-                     business_address=current_app.config['BUSINESS_ADDRESS'],
-                     printed_by=current_user.full_name,
-                     logo_path=url_for('static', filename='images/cthlogo.jpg'))
+    pdf = quotation_pdf(quotation, (quotation.created_by.full_name if quotation.created_by else None) or current_user.full_name)
     if pdf is None:
         flash("Failed to generate the quotation PDF.", "danger")
         return redirect(url_for('cashier.quotations'))
     return send_file(pdf, as_attachment=True, download_name=f"quotation_{quotation.quotation_number}.pdf",
                      mimetype='application/pdf')
+
+@cashier_bp.route('/quotations/<int:quotation_id>/email', methods=['POST'])
+@login_required
+@cashier_required
+def send_quotation_email(quotation_id):
+    from ..security import verify_csrf
+    verify_csrf()
+    quotation = Quotation.query.get_or_404(quotation_id)
+    if quotation.created_by_id != current_user.id:
+        abort(403)
+    ok, msg = documents.email_quotation(quotation, request.form.get('email'), current_user, request.form.get('note', ''))
+    flash(f"Quotation {quotation.quotation_number}: {msg}" if ok else msg, "success" if ok else "danger")
+    return redirect(url_for('cashier.quotations'))
+
+
+@cashier_bp.route('/receipt/<int:receipt_id>/email', methods=['POST'])
+@login_required
+@cashier_required
+def send_receipt_email(receipt_id):
+    from ..security import verify_csrf
+    verify_csrf()
+    receipt = Receipt.query.get_or_404(receipt_id)
+    ok, msg = documents.email_receipt(receipt, request.form.get('email'))
+    flash(f"Receipt {receipt.receipt_number}: {msg}" if ok else msg, "success" if ok else "danger")
+    return redirect(safe_next(request.form.get('next'), url_for('cashier.daily_report')))
+
 
 @cashier_bp.route('/quotations/<int:quotation_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -732,7 +769,8 @@ def edit_quotation(quotation_id):
         try:
             customer, items, discount = quotes.parse_quote_form(
                 request.form, current_app.config['CASHIER_MAX_DISCOUNT_PERCENT'])
-            quotes.save_quotation(current_user, customer, items, discount, quotation=quotation)
+            email, phone = quotes.parse_contact(request.form)
+            quotes.save_quotation(current_user, customer, items, discount, quotation=quotation, email=email, phone=phone)
             flash(f"Quotation {quotation.quotation_number} updated.", "success")
             return redirect(url_for('cashier.quotations'))
         except PricingError as exc:

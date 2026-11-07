@@ -56,7 +56,12 @@ class Config:
         "1st Floor, Workstation 25, Harare, Zimbabwe",
     )
     BUSINESS_PHONE = os.environ.get("BUSINESS_PHONE", "")
-    BUSINESS_EMAIL = os.environ.get("BUSINESS_EMAIL", "")
+    BUSINESS_EMAIL = os.environ.get("BUSINESS_EMAIL", "info@crowntechhub.co.zw").strip()
+    BUSINESS_WEBSITE = os.environ.get("BUSINESS_WEBSITE", "www.crowntechhub.co.zw").strip()
+    # Numbers printed on receipts, quotations, the catalogue and the stock list (comma separated)
+    BUSINESS_PHONES = os.environ.get("BUSINESS_PHONES", "+263 77 465 9090, +263 78 289 6646, +263 77 832 9323")
+    # "Valid until" date on quotations and in the quotation email. 0 hides it.
+    QUOTATION_VALID_DAYS = int(os.environ.get("QUOTATION_VALID_DAYS", "14"))
     # International format, digits only (e.g. 263771234567). Enables "Chat on WhatsApp" links.
     BUSINESS_WHATSAPP = os.environ.get("BUSINESS_WHATSAPP", "").replace("+", "").replace(" ", "")
 

@@ -80,6 +80,7 @@ class Receipt(db.Model):
     discount = db.Column(db.Float, default=0.0)          # money taken off the subtotal
     delivery_fee = db.Column(db.Float, default=0.0)      # delivery charged on this sale (total includes it)
     delivery_address = db.Column(db.String(300), nullable=True)
+    emailed_at = db.Column(db.DateTime, nullable=True)   # last time the receipt was emailed to the customer
     sales = db.relationship('Sale', backref='receipt', lazy=True)
 
 class Expense(db.Model):
@@ -127,6 +128,9 @@ class Quotation(db.Model):
     items = db.relationship('QuotationItem', backref='quotation', cascade='all, delete-orphan')
     discount = db.Column(db.Float, default=0)   # <---- Add this line
     customer_name = db.Column(db.String(100))  # Optional customer info
+    customer_email = db.Column(db.String(120))   # where the quotation can be emailed
+    customer_phone = db.Column(db.String(30))
+    emailed_at = db.Column(db.DateTime)          # last time it was emailed to the customer
     created_by = db.relationship('User')
     converted = db.Column(db.Boolean, default=False)
     @property

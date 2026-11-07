@@ -1,0 +1,18 @@
+Hello {{ name or 'there' }},
+
+Thank you for shopping with {{ biz_name }}! We've received your payment. Your receipt {{ receipt.receipt_number }} is below.
+
+{% for i in items %}- {{ i.name|pdftext(80) }} x {{ i.quantity }}: {{ i.original_total_price|money }}
+{% endfor %}{% if receipt.discount %}Discount: -{{ receipt.discount|money }}
+{% endif %}{% if receipt.delivery_fee %}Delivery: {{ receipt.delivery_fee|money }}
+{% endif %}Total paid: {{ receipt.total|money }}
+
+Download your receipt (PDF): {{ link }}
+{% if attached %}A PDF copy is also attached to this email.
+{% endif %}
+Please keep your receipt: your purchase has three months warranty with the original receipt.
+
+Questions? Call us on {{ phones[0] if phones else biz_phone }}{% if biz_whatsapp %} or WhatsApp +{{ biz_whatsapp }}{% endif %}, or just reply to this email.
+
+Thank you,
+{{ biz_name }}

@@ -1,0 +1,16 @@
+{% extends "email/_layout.html" %}
+{% block body %}
+<p>Hello {{ name or 'there' }},</p>
+<p>Thank you for shopping with <strong>{{ biz_name }}</strong>! We've received your payment. Your receipt <strong>{{ receipt.receipt_number }}</strong> is below.</p>
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-top:1px solid #dfe4ee;margin:14px 0">
+  {% for i in items %}<tr><td style="border-bottom:1px solid #eef1f8">{{ i.name|pdftext(80) }} &times; {{ i.quantity }}</td><td align="right" style="border-bottom:1px solid #eef1f8;white-space:nowrap">{{ i.original_total_price|money }}</td></tr>{% endfor %}
+  {% if receipt.discount %}<tr><td style="color:#54617a">Discount</td><td align="right" style="color:#b3261e">&minus; {{ receipt.discount|money }}</td></tr>{% endif %}
+  {% if receipt.delivery_fee %}<tr><td style="color:#54617a">Delivery</td><td align="right">{{ receipt.delivery_fee|money }}</td></tr>{% endif %}
+  <tr><td><strong>Total paid</strong></td><td align="right"><strong>{{ receipt.total|money }}</strong></td></tr>
+</table>
+<p><a href="{{ link }}" style="display:inline-block;background:#f2b01e;color:#2a1d00;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:999px">Download your receipt (PDF)</a></p>
+{% if attached %}<p style="color:#54617a;font-size:13px">A PDF copy is also attached to this email.</p>{% endif %}
+<p style="color:#54617a;font-size:13.5px">Please keep your receipt: your purchase has three months warranty with the original receipt.</p>
+<p>Questions about your purchase? Call us on {{ phones[0] if phones else biz_phone }}{% if biz_whatsapp %} or WhatsApp +{{ biz_whatsapp }}{% endif %}, or just reply to this email.</p>
+<p style="margin-bottom:0">Thank you,<br>{{ biz_name }}</p>
+{% endblock %}

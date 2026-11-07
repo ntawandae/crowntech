@@ -16,11 +16,12 @@ import json
 import secrets
 from werkzeug.security import generate_password_hash
 from .. import login_manager
-from ..services import pos, quotes
+from ..services import documents, pos, quotes
+from ..security import safe_next
 from ..services import photos as photo_svc
 from ..services import storage as cloud
 from ..services.pos import PricingError, SaleError
-from ..utils.receipts import receipt_items, receipt_pdf, render_pdf, static_link_callback
+from ..utils.receipts import receipt_items, receipt_pdf, render_pdf, static_link_callback, quotation_pdf, catalog_pdf, stock_list_pdf
 from ..utils.timeutil import day_range, zim_now, zim_today
 
 # ----------------------------------------------------------------------
@@ -908,8 +909,16 @@ def quotations():
     if request.method == 'POST':
         try:
             customer, items, discount = quotes.parse_quote_form(request.form)
-            q = quotes.save_quotation(current_user, customer, items, discount)
+            email, phone = quotes.parse_contact(request.form)
+            q = quotes.save_quotation(current_user, customer, items, discount, email=email, phone=phone)
             flash(f"Quotation {q.quotation_number} created.", "success")
+            if request.form.get('email_now'):
+                if not email:
+                    flash("Add the customer's email address to send the quotation.", "warning")
+                else:
+                    ok, msg = documents.email_quotation(q, email, current_user)
+                    flash(f"Quotation {q.quotation_number}: {msg}" if ok else f"The quotation was saved, but it could not be emailed. {msg}",
+                          "success" if ok else "warning")
         except PricingError as exc:
             flash(str(exc), "danger")
         except Exception:
@@ -934,7 +943,8 @@ def edit_quotation(quotation_id):
     if request.method == 'POST':
         try:
             customer, items, discount = quotes.parse_quote_form(request.form)
-            quotes.save_quotation(current_user, customer, items, discount, quotation=quotation)
+            email, phone = quotes.parse_contact(request.form)
+            quotes.save_quotation(current_user, customer, items, discount, quotation=quotation, email=email, phone=phone)
             flash(f"Quotation {quotation.quotation_number} updated.", "success")
             return redirect(url_for('admin.quotations'))
         except PricingError as exc:
@@ -950,6 +960,28 @@ def edit_quotation(quotation_id):
     return render_template('quotations.html', products=products, quotations=everything,
                            edit=quotes.quotation_edit_payload(quotation), edit_id=quotation.id,
                            edit_number=quotation.quotation_number)
+
+@admin_bp.route('/quotations/<int:quotation_id>/email', methods=['POST'])
+@login_required
+def send_quotation_email(quotation_id):
+    from ..security import verify_csrf
+    verify_csrf()
+    quotation = Quotation.query.get_or_404(quotation_id)
+    ok, msg = documents.email_quotation(quotation, request.form.get('email'), current_user, request.form.get('note', ''))
+    flash(f"Quotation {quotation.quotation_number}: {msg}" if ok else msg, "success" if ok else "danger")
+    return redirect(url_for('admin.quotations'))
+
+
+@admin_bp.route('/receipt/<int:receipt_id>/email', methods=['POST'])
+@login_required
+def send_receipt_email(receipt_id):
+    from ..security import verify_csrf
+    verify_csrf()
+    receipt = Receipt.query.get_or_404(receipt_id)
+    ok, msg = documents.email_receipt(receipt, request.form.get('email'))
+    flash(f"Receipt {receipt.receipt_number}: {msg}" if ok else msg, "success" if ok else "danger")
+    return redirect(safe_next(request.form.get('next'), url_for('admin.view_sales')))
+
 
 @admin_bp.route('/quotations/<int:quotation_id>/convert', methods=['POST'])
 @login_required
@@ -972,6 +1004,9 @@ def convert_quotation(quotation_id):
 
     receipt = result['receipt']
     flash(f"Quotation {quotation.quotation_number} converted. Receipt #{receipt.receipt_number} recorded.", "success")
+    emailed = documents.auto_email_receipt(receipt)
+    if emailed:
+        flash(emailed, "success")
     pdf = receipt_pdf(receipt, result['items'], current_user.full_name)
     if pdf is None:
         flash("The receipt PDF could not be created: reprint it from Sales.", "warning")
@@ -983,11 +1018,7 @@ def convert_quotation(quotation_id):
 @login_required
 def download_quotation(quotation_id):
     quotation = Quotation.query.get_or_404(quotation_id)
-    pdf = render_pdf('print_quotation.html', quotation=quotation,
-                     business_name=current_app.config['BUSINESS_NAME'],
-                     business_address=current_app.config['BUSINESS_ADDRESS'],
-                     printed_by=current_user.full_name,
-                     logo_path=url_for('static', filename='images/cthlogo.jpg'))
+    pdf = quotation_pdf(quotation, (quotation.created_by.full_name if quotation.created_by else None) or current_user.full_name)
     if pdf is None:
         flash("Failed to generate the quotation PDF.", "danger")
         return redirect(url_for('admin.quotations'))
@@ -1011,33 +1042,13 @@ def reprint_receipt(receipt_id):
 def download_catalog():
     if current_user.role != 'admin':
         abort(403)
-
     try:
-        products = Product.query.all()
-        for product in products:
-            product.image_path = None
-            name = (product.image_filename or "").strip()
-            if name:
-                product.image_path = photo_svc.card_file(name)     # local file, or fetched from Supabase Storage
-                if not product.image_path:
-                    flash(f"Image file not found for product {product.name}: {name}", "warning")
-
-        pdf = generate_pdf('catalog.html', {
-            'products': products,
-            'business_name': "Crown Tech Hub",
-            'business_address': "Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25",
-            'business_contact': "Phone: +263774659090 | +263782896646 | +263778329323 | Email: crowntechzw@gmail.com",
-            'logo_path': url_for('static', filename='images/cthlogo.jpg', _external=True),
-            'current_year': zim_now().year
-        })
-
-        return send_file(
-            pdf,
-            as_attachment=True,
-            download_name="catalog.pdf",
-            mimetype='application/pdf'
-        )
+        pdf = catalog_pdf(Product.query.all())
+        if pdf is None:
+            raise RuntimeError("the PDF engine could not build the document")
+        return send_file(pdf, as_attachment=True, download_name="Crown_Tech_Hub_Catalogue.pdf", mimetype='application/pdf')
     except Exception as e:
+        logger.exception("Catalogue PDF failed")
         flash(f"Error generating PDF: {str(e)}", "danger")
         return redirect(url_for('admin.admin_dashboard', view='products'))
 
@@ -1046,37 +1057,15 @@ def download_catalog():
 def download_stock_list():
     if current_user.role != 'admin':
         abort(403)
-
     try:
-        products = Product.query.order_by(Product.quantity.desc()).all()
-        for product in products:
-            product.image_path = None
-            name = (product.image_filename or "").strip()
-            if name:
-                product.image_path = photo_svc.card_file(name)     # local file, or fetched from Supabase Storage
-                if not product.image_path:
-                    flash(f"Image file not found for product {product.name}: {name}", "warning")
-
-        pdf = generate_pdf('stock_list.html', {
-            'products': products,
-            'business_name': "Crown Tech Hub",
-            'business_address': "Karimapondo Mall, Corner Robert Mugabe & Leopold Takawira, 1st Floor, Workstation 25",
-            'business_contact': "Phone: +263774659090 | +263782896646 | +263778329323 | Email: crowntechzw@gmail.com",
-            'logo_path': url_for('static', filename='images/cthlogo.jpg', _external=True),
-            'current_year': zim_now().year,
-            'current_date': zim_now().strftime('%Y-%m-%d')
-        })
-
-        return send_file(
-            pdf,
-            as_attachment=True,
-            download_name="stock_list.pdf",
-            mimetype='application/pdf'
-        )
+        pdf = stock_list_pdf(Product.query.all())
+        if pdf is None:
+            raise RuntimeError("the PDF engine could not build the document")
+        return send_file(pdf, as_attachment=True, download_name="Crown_Tech_Hub_Stock_List.pdf", mimetype='application/pdf')
     except Exception as e:
+        logger.exception("Stock list PDF failed")
         flash(f"Error generating stock list PDF: {str(e)}", "danger")
         return redirect(url_for('admin.admin_dashboard', view='products'))
-
 
 
 # inside your admin routes

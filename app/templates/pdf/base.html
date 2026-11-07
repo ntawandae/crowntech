@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}{{ co.name }}{% endblock %}</title>
+<style>
+  @page {
+    size: a4 portrait;
+    margin: 4.7cm 1.6cm 2.3cm 1.6cm;
+    @frame header_frame { -pdf-frame-content: pdf_header; left: 1.6cm; width: 17.8cm; top: 1.0cm; height: 3.5cm; }
+    @frame footer_frame { -pdf-frame-content: pdf_footer; left: 1.6cm; width: 17.8cm; top: 27.45cm; height: 1.9cm; }
+  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1f2a44; }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top; }
+  .co-name { font-size: 17pt; font-weight: bold; color: #101b36; }
+  .co-line { font-size: 8pt; color: #5b6784; line-height: 1.35; }
+  .doc-title { font-size: 21pt; font-weight: bold; color: #101b36; text-align: right; }
+  .doc-sub { font-size: 9pt; color: #5b6784; text-align: right; line-height: 1.4; }
+  .doc-sub b { color: #101b36; }
+  .gold-rule { border-top: 2.5pt solid #f2b01e; font-size: 1pt; line-height: 1pt; height: 1pt; }
+  .label { font-size: 7.5pt; font-weight: bold; color: #8a6200; }
+  .muted { color: #5b6784; }
+  .small { font-size: 8pt; }
+  h1.page-title { font-size: 15pt; color: #101b36; margin: 0 0 2pt 0; }
+  h2.section { font-size: 11pt; color: #101b36; margin: 12pt 0 5pt 0; padding: 0 0 3pt 0; border-bottom: 1.2pt solid #f2b01e; }
+
+  td.box { background-color: #f4f6fb; border-left: 3pt solid #f2b01e; padding: 9pt 11pt; }
+  .box .name { font-size: 11pt; font-weight: bold; color: #101b36; }
+  .box .line { color: #46526d; line-height: 1.5; }
+
+  table.items { width: 100%; }
+  table.items th { background-color: #101b36; color: #ffffff; font-size: 7.5pt; font-weight: bold; padding: 7pt 8pt; text-align: left; }
+  table.items td { padding: 8pt 8pt; border-bottom: 0.6pt solid #e3e7f0; font-size: 9pt; }
+  table.items .alt td { background-color: #f8f9fc; }
+  .r { text-align: right; }
+  .c { text-align: center; }
+  table.items th.r { text-align: right; }
+  table.items th.c { text-align: center; }
+
+  table.totals { width: 100%; }
+  table.totals td { padding: 4pt 8pt; font-size: 9.5pt; }
+  table.totals .grand td { background-color: #101b36; color: #ffffff; font-size: 12pt; font-weight: bold; padding: 8pt 10pt; }
+  table.totals .grand .amt { color: #f2b01e; }
+  .minus { color: #b3261e; }
+
+  .note { border: 0.8pt solid #e3e7f0; padding: 8pt 10pt; background-color: #fbfcfe; color: #46526d; line-height: 1.5; }
+  .note b { color: #101b36; }
+
+  #pdf_footer { font-size: 7.5pt; color: #6b7691; }
+  .foot-rule { border-top: 0.8pt solid #dfe4ee; font-size: 1pt; line-height: 1pt; height: 1pt; }
+  {% block extra_css %}{% endblock %}
+</style>
+</head>
+<body>
+
+<div id="pdf_header">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="74" valign="middle"><img src="{{ co.logo }}" width="64" height="54"></td>
+      <td valign="middle">
+        <div class="co-name">{{ co.name }}</div>
+        <div class="co-line">
+          {% for line in co.address_lines %}{{ line }}<br>{% endfor %}
+          {% if co.phones %}{{ co.phones|join('  |  ') }}<br>{% endif %}
+          {% if co.email %}{{ co.email }}{% endif %}{% if co.email and co.website %}  |  {% endif %}{% if co.website %}{{ co.website }}{% endif %}
+        </div>
+      </td>
+      <td width="175" valign="middle">{% block header_right %}{% endblock %}</td>
+    </tr>
+  </table>
+  <div class="gold-rule">&nbsp;</div>
+</div>
+
+<div id="pdf_footer">
+  <div class="foot-rule">&nbsp;</div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:3pt">
+    <tr>
+      <td width="82%"><b>{% block footer_note %}Thank you for choosing {{ co.name }}.{% endblock %}</b><br>
+        {% if co.phones %}{{ co.phones|join('  |  ') }}{% endif %}{% if co.email %}  |  {{ co.email }}{% endif %}</td>
+      <td width="18%" align="right" valign="bottom">Page <pdf:pagenumber> of <pdf:pagecount></td>
+    </tr>
+  </table>
+</div>
+
+{% block content %}{% endblock %}
+</body>
+</html>

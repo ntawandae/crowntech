@@ -1,225 +1,96 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Receipt {{ receipt_number }}</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 14px;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            line-height: 1.3;
-        }
-        .container {
-            width: 600px;
-            max-width: 95%;
-            margin: 20px auto;
-            background: #fff;
-            padding: 20px;
-            page-break-inside: avoid;
-            border-radius: 8px;
-        }
-        header table {
-            width: 100%;
-            border-bottom: 3px solid #1a73e8;
-            margin-bottom: 20px;
-            border-collapse: collapse;
-        }
-        header td {
-            vertical-align: top;
-            padding: 0;
-        }
-        .business-name {
-            font-weight: bold;
-            font-size: 1.6rem;
-            color: #1a73e8;
-            line-height: 1.2;
-            margin: 0;
-        }
-        .business-details {
-            font-size: 0.95rem;
-            line-height: 1.2;
-        }
-        h2 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #222;
-            text-align: center;
-            text-transform: uppercase;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
-        }
-        table.receipt-details {
-            width: 100%;
-            font-size: 0.9rem;
-            margin-bottom: 15px;
-            border-collapse: collapse;
-            line-height: 1.3;
-        }
-        table.receipt-details td {
-            vertical-align: top;
-            padding: 0;
-            margin: 0;
-        }
-        table.items {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-        table.items th, table.items td {
-            padding: 10px;
-            text-align: left;
-            border: 1px solid #eee;
-        }
-        table.items th {
-            background: #e8f0fe;
-            color: #1a73e8;
-            text-transform: uppercase;
-            font-weight: 700;
-        }
-        table.items tbody tr:nth-child(even) {
-            background: #f9fbff;
-        }
-        .summary {
-            text-align: right;
-            font-size: 0.95rem;
-        }
-        .summary p {
-            margin: 2px 0;
-        }
-        .total {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #1a73e8;
-            border-top: 1px solid #333;
-            padding-top: 5px;
-        }
-        .barcode {
-            text-align: center;
-            margin: 15px 0;
-        }
-        .barcode p {
-            font-family: 'Courier New', monospace;
-            letter-spacing: 1px;
-            background: #e8f0fe;
-            padding: 10px;
-            border: 1px solid #1a73e8;
-            border-radius: 6px;
-            display: inline-block;
-        }
-        footer {
-            font-size: 0.85rem;
-            color: #777;
-            border-top: 1px solid #ddd;
-            padding-top: 10px;
-            margin-top: 20px;
-            font-style: italic;
-            line-height: 1.2;
-            text-align: center;
-        }
-        footer p {
-            margin: 1px 0;
-            padding: 0;
-        }
-    </style>
-</head>
-<body>
-<div class="container">
-    <!-- Header -->
-    <header>
-        <table>
-            <tr>
-                <td style="text-align:left; vertical-align:top; padding-top:20px;">
-                    <div class="business-name">Crown Tech Hub</div>
-                    <div class="business-details">
-                        Karimapondo Mall, Corner Robert Mugabe &amp; Leopold Takawira<br>
-                        1st Floor, Workstation 25, Harare, Zimbabwe<br>
-                        Phone: +263774659090 | +263782896646 | +263778329323<br>
-                        Email: crowntechzw@gmail.com
-                    </div>
-                </td>
-                <td align="right" valign="middle">
-                    <img src="{{ logo_path }}" alt="{{ business_name }} Logo" style="height:160px; display:block; border-radius:8px;">
-                </td>
-            </tr>
-        </table>
-    </header>
+{% extends "pdf/base.html" %}
+{% block title %}Receipt {{ receipt_number }}{% endblock %}
 
-    <!-- Receipt Title -->
-    <h2>Receipt</h2>
+{% block header_right %}
+  <div class="doc-title">RECEIPT</div>
+  <div class="doc-sub"><b>{{ receipt_number }}</b><br>
+    {% if timestamp %}{{ timestamp.strftime('%d %B %Y') }}<br>{{ timestamp.strftime('%I:%M %p') }}{% endif %}</div>
+{% endblock %}
 
-    <!-- Receipt & Customer Details -->
-    <table class="receipt-details">
-        <tr>
-            <td style="width:72%; vertical-align:top; padding:0; margin:0;">
-                <div><strong>Receipt #:</strong> {{ receipt_number }}</div>
-                <div><strong>Date:</strong> {{ timestamp.strftime('%d %B %Y, %I:%M %p') if timestamp else '' }}</div>
-                <div><strong>Prepared by:</strong> {{ printed_by }}</div>
-            </td>
-            <td style="width:28%; vertical-align:top; text-align:left; padding:0; margin:0;">
-                <div><strong>Customer:</strong> {{ customer_name or 'N/A' }}</div>
-                {% if customer_email %}
-                <div><strong>Email:</strong> {{ customer_email }}</div>
-                {% endif %}
-                {% if customer_phone %}
-                <div><strong>Phone:</strong> {{ customer_phone }}</div>
-                {% endif %}
-                {% if delivery_address %}
-                <div><strong>Deliver to:</strong> {{ delivery_address }}</div>
-                {% endif %}
-            </td>
-        </tr>
-    </table>
+{% block footer_note %}Thank you for your purchase.{% endblock %}
 
-    <!-- Items Table -->
-    <table class="items">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in items %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ item.name if item.name else item.product_name }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>${{ "%.2f"|format(item.price if item.price else item.unit_price) }}</td>
-                <td>${{ "%.2f"|format(item.original_total_price if item.original_total_price is defined else item.total_price) }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+{% block extra_css %}
+  .stamp { border: 2.2pt solid #101b36; padding: 6pt 0 5pt 0; text-align: center; }
+  .stamp .big { font-size: 20pt; font-weight: bold; color: #101b36; }
+  .stamp .sm { font-size: 7.5pt; color: #5b6784; }
+{% endblock %}
 
-    <!-- Summary / Totals -->
-    <div class="summary">
-        <p><strong>Subtotal:</strong> ${{ "%.2f"|format(subtotal) }}</p>
-        <p><strong>Tax:</strong> ${{ "%.2f"|format(tax) }}</p>
-        <p><strong>Discount:</strong> {% if discount > 0 %}-${{ "%.2f"|format(discount) }}{% else %}$0.00{% endif %}</p>
-        {% if delivery_fee and delivery_fee > 0 %}<p><strong>Delivery:</strong> ${{ "%.2f"|format(delivery_fee) }}</p>{% endif %}
-        <p class="total"><strong>Grand Total:</strong> ${{ "%.2f"|format(total) }}</p>
-    </div>
+{% block content %}
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="56%" class="box">
+        <div class="label">RECEIVED FROM</div>
+        <div class="name">{{ (customer_name or 'Walk-in customer')|pdftext(60) }}</div>
+        <div class="line">
+          {% if customer_phone %}{{ customer_phone|pdftext }}<br>{% endif %}
+          {% if customer_email %}{{ customer_email|pdftext }}<br>{% endif %}
+          {% if delivery_address %}Deliver to: {{ delivery_address|pdftext(120) }}{% endif %}
+        </div>
+    </td>
+    <td width="3%">&nbsp;</td>
+    <td width="41%" class="box">
+        <div class="label">RECEIPT DETAILS</div>
+        <div class="line">
+          <b>Receipt no:</b> {{ receipt_number }}<br>
+          <b>Date:</b> {% if timestamp %}{{ timestamp.strftime('%d %b %Y, %I:%M %p') }}{% endif %}<br>
+          <b>Served by:</b> {{ printed_by|pdftext(40) }}
+        </div>
+    </td>
+  </tr>
+</table>
 
-    <!-- Barcode / Receipt Number -->
-    <div class="barcode">
-        <p>{{ receipt_number }}</p>
-    </div>
+<div style="height:12pt">&nbsp;</div>
 
-    <!-- Footer -->
-    <footer>
-        <p>Thank you for choosing {{ business_name }}!</p>
-        <p>Three months Warranty with original receipt.</p>
-        <p>Contact: +263 77 8329 323 | Email: crowntechzw@gmail.com</p>
-        <p>&copy; {{ current_year }} {{ business_name }}. All rights reserved.</p>
-    </footer>
-</div>
-</body>
-</html>
+<table class="items" repeat="1">
+  <tr>
+    <th width="6%">#</th>
+    <th width="46%">DESCRIPTION</th>
+    <th width="9%" class="c">QTY</th>
+    <th width="19%" class="r">UNIT PRICE</th>
+    <th width="20%" class="r">AMOUNT</th>
+  </tr>
+  {% for item in items %}
+  <tr class="{{ 'alt' if loop.index is even }}">
+    <td class="muted">{{ loop.index }}</td>
+    <td><b>{{ (item.name if item.name else item.product_name)|pdftext(95) }}</b></td>
+    <td class="c">{{ item.quantity }}</td>
+    <td class="r">{{ (item.price if item.price else item.unit_price)|pdfmoney }}</td>
+    <td class="r"><b>{{ (item.original_total_price if item.original_total_price is defined else item.total_price)|pdfmoney }}</b></td>
+  </tr>
+  {% endfor %}
+</table>
+
+<div style="height:10pt">&nbsp;</div>
+
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="46%" valign="top">
+      <div class="stamp" style="width:120pt">
+        <div class="big">PAID</div>
+        <div class="sm">Thank you</div>
+      </div>
+    </td>
+    <td width="54%" valign="top">
+      <table class="totals" cellpadding="0" cellspacing="0">
+        <tr><td class="muted">Subtotal</td><td class="r">{{ subtotal|pdfmoney }}</td></tr>
+        {% if discount and discount > 0 %}<tr><td class="muted">Discount</td><td class="r minus">- {{ discount|pdfmoney }}</td></tr>{% endif %}
+        {% if delivery_fee and delivery_fee > 0 %}<tr><td class="muted">Delivery</td><td class="r">{{ delivery_fee|pdfmoney }}</td></tr>{% endif %}
+        {% if tax and tax > 0 %}<tr><td class="muted">Tax</td><td class="r">{{ tax|pdfmoney }}</td></tr>{% endif %}
+        <tr class="grand"><td>TOTAL PAID</td><td class="r amt">{{ total|pdfmoney }}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<div style="height:16pt">&nbsp;</div>
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr><td align="center">
+    <pdf:barcode value="{{ receipt_number }}" type="code128" barheight="0.9cm" barwidth="0.032cm" humanreadable="0" />
+    <div class="small muted" style="margin-top:2pt">{{ receipt_number }}</div>
+  </td></tr>
+</table>
+
+<div style="height:12pt">&nbsp;</div>
+<div class="note"><b>Warranty:</b> three months with the original receipt. Please keep this receipt safe.
+  Questions? Call {{ co.phones[0] if co.phones }}{% if co.email %} or email {{ co.email }}{% endif %}.</div>
+{% endblock %}

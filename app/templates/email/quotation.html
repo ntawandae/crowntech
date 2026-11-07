@@ -1,0 +1,16 @@
+{% extends "email/_layout.html" %}
+{% block body %}
+<p>Hello {{ name or 'there' }},</p>
+<p>Thank you for your interest in <strong>{{ biz_name }}</strong>. As requested, here is your quotation <strong>{{ q.quotation_number }}</strong>.</p>
+{% if note %}<p style="background:#f5f7fc;border-left:3px solid #f2b01e;padding:10px 14px;color:#2b3550;margin:14px 0">{{ note }}</p>{% endif %}
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-top:1px solid #dfe4ee;margin:14px 0">
+  {% for i in q.items %}<tr><td style="border-bottom:1px solid #eef1f8">{{ i.product_name|pdftext(80) }} &times; {{ i.quantity }}</td><td align="right" style="border-bottom:1px solid #eef1f8;white-space:nowrap">{{ i.total_price|money }}</td></tr>{% endfor %}
+  {% if q.discount %}<tr><td style="color:#54617a">Discount</td><td align="right" style="color:#b3261e">&minus; {{ q.discount|money }}</td></tr>{% endif %}
+  <tr><td><strong>Total</strong></td><td align="right"><strong>{{ total|money }}</strong></td></tr>
+</table>
+{% if valid_until %}<p style="color:#54617a;font-size:13.5px;margin:0 0 14px">This quotation is valid until <strong>{{ valid_until.strftime('%d %B %Y') }}</strong>. Prices are in US dollars.</p>{% endif %}
+<p><a href="{{ link }}" style="display:inline-block;background:#f2b01e;color:#2a1d00;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:999px">View your quotation (PDF)</a></p>
+{% if attached %}<p style="color:#54617a;font-size:13px">A PDF copy is also attached to this email.</p>{% endif %}
+<p>To go ahead, simply reply to this email or call us on {{ phones[0] if phones else biz_phone }}{% if biz_whatsapp %} or WhatsApp +{{ biz_whatsapp }}{% endif %}. We'll be glad to help.</p>
+<p style="margin-bottom:0">Kind regards,<br><strong>{{ sender_name }}</strong><br>{{ biz_name }}</p>
+{% endblock %}

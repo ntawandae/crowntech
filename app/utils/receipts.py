@@ -42,9 +42,11 @@ def receipt_items(receipt):
 
 
 def receipt_pdf(receipt, items, printed_by):
+    from .pdf_docs import company
     cfg = current_app.config
     return render_pdf(
         "receipt_template.html",
+        co=company(),
         items=items,
         subtotal=receipt.subtotal or 0,
         discount=receipt.discount or 0,
@@ -63,3 +65,65 @@ def receipt_pdf(receipt, items, printed_by):
         current_year=receipt.timestamp.year if receipt.timestamp else "",
         timestamp=receipt.timestamp,
     )
+
+
+def quotation_pdf(quotation, prepared_by):
+    """The quotation as a PDF (BytesIO), or None if the PDF engine failed."""
+    from datetime import timedelta
+
+    from .pdf_docs import company
+    days = int(current_app.config.get("QUOTATION_VALID_DAYS") or 0)
+    valid_until = (quotation.created_at + timedelta(days=days)) if (days and quotation.created_at) else None
+    return render_pdf("print_quotation.html", co=company(), quotation=quotation, prepared_by=prepared_by,
+                      valid_until=valid_until, valid_days=days)
+
+
+def catalog_pdf(products):
+    """Customer catalogue: in-stock products first, grouped by category, with photos and key specs."""
+    from ..services.specs import CATEGORY_ORDER, extract_specs, normalize_category, short_title
+    from .pdf_docs import company
+    from .timeutil import zim_now
+    from ..services import photos
+
+    groups = {}
+    for p in products:
+        if (p.price or 0) <= 0:
+            continue
+        cat = normalize_category(p.category)
+        groups.setdefault(cat, []).append({
+            "title": short_title(p.name, 62), "price": p.price, "in_stock": (p.quantity or 0) > 0,
+            "specs": extract_specs(p.name)[:3], "image": photos.card_file((p.image_filename or "").strip()),
+        })
+    ordered = sorted(groups, key=lambda c: CATEGORY_ORDER.index(c) if c in CATEGORY_ORDER else len(CATEGORY_ORDER))
+    sections = []
+    for cat in ordered:
+        items = sorted(groups[cat], key=lambda i: (not i["in_stock"], i["title"].lower()))
+        sections.append({"name": cat, "rows": [items[i:i + 3] for i in range(0, len(items), 3)], "count": len(items)})
+    now = zim_now()
+    return render_pdf("catalog.html", co=company(), sections=sections, total=sum(s["count"] for s in sections),
+                      today=now, current_year=now.year)
+
+
+def stock_list_pdf(products):
+    """Internal stock list: grouped by category with photo, quantity and selling price, plus totals."""
+    from ..services.specs import CATEGORY_ORDER, normalize_category, short_title
+    from .pdf_docs import company
+    from .timeutil import zim_now
+    from ..services import photos
+
+    groups = {}
+    units = value = 0
+    for p in products:
+        qty = int(p.quantity or 0)
+        units += qty
+        value += qty * float(p.price or 0)
+        groups.setdefault(normalize_category(p.category), []).append({
+            "title": short_title(p.name, 70), "qty": qty, "price": float(p.price or 0),
+            "image": photos.card_file((p.image_filename or "").strip()),
+        })
+    ordered = sorted(groups, key=lambda c: CATEGORY_ORDER.index(c) if c in CATEGORY_ORDER else len(CATEGORY_ORDER))
+    sections = [{"name": c, "lines": sorted(groups[c], key=lambda i: (-i["qty"], i["title"].lower()))} for c in ordered]
+    now = zim_now()
+    return render_pdf("stock_list.html", co=company(), sections=sections, products=sum(len(s["lines"]) for s in sections),
+                      units=units, value=value, in_stock=sum(1 for s in sections for i in s["lines"] if i["qty"] > 0),
+                      out_of_stock=sum(1 for s in sections for i in s["lines"] if i["qty"] <= 0), today=now)

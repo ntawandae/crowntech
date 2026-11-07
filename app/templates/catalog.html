@@ -1,307 +1,49 @@
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Product Catalog - {{ business_name }}</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 11pt;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            line-height: 1.4;
-            background: #f9fbff;
-        }
-        .container {
-            width: 100%;
-            max-width: 718px;
-            margin: 10px auto;
-            margin-bottom: 20px;
-            padding: 0;
-        }
+{% extends "pdf/base.html" %}
+{% block title %}Product catalogue{% endblock %}
 
-        /* ===== HEADER ONLY ===== */
-        header {
-            width: 100%;
-            margin: 0 0 5px 0;
-            padding: 0;
-        }
-        header table {
-            width: 100%;
-            border-bottom: 2px solid #1a73e8;
-            border-collapse: collapse;
-            margin: 0;
-            padding: 0;
-        }
-        header td {
-            vertical-align: top;
-            padding: 0;
-        }
-        .business-name {
-            font-weight: bold;
-            font-size: 16pt;
-            color: #1a73e8;
-            line-height: 1.2;
-            margin: 0;
-        }
-        .business-details {
-            font-size: 10pt;
-            line-height: 1.2;
-            margin: 0;
-        }
-        h2 {
-            font-size: 16pt;
-            font-weight: 700;
-            color: #222;
-            text-align: center;
-            text-transform: uppercase;
-            border-bottom: 1px solid #ddd;
-            margin-top: 20px;
-            padding: 2px 0;
-            line-height: 1.2;
-        }
+{% block header_right %}
+  <div class="doc-title" style="font-size:15pt">PRODUCT CATALOGUE</div>
+  <div class="doc-sub"><b>{{ total }} products</b><br>Prices in US dollars<br>{{ today.strftime('%d %B %Y') }}</div>
+{% endblock %}
 
-        /* ===== PRODUCT TABLES ===== */
-        .product-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 10px;
-            margin: 0;
-        }
-        .product-table td {
-            border: 1px solid #eee;
-            padding: 10px;
-            background: #f9fbff;
-            width: 50%;
-            vertical-align: top;
-            text-align: center;
-            box-sizing: border-box;
-        }
-        .product-img-container {
-            width: 140px;
-            height: 130px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 8px auto;
-            background: none;
-            border: none;
-            box-sizing: border-box;
-            overflow: hidden;
-        }
-        .product-img {
-            height: 120px;
-            width: auto;
-            object-fit: contain;
-            display: block;
-        }
-        .pseudo-img {
-            width: 140px;
-            height: 130px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10pt;
-            color: #666;
-            margin: 0 auto 8px auto;
-            box-sizing: border-box;
-        }
-        .product-details {
-            text-align: center;
-            line-height: 1.1;
-            margin: 0;
-            padding: 0;
-        }
-        .product-name-price {
-            margin: 0;
-            padding: 0;
-            line-height: 1.1;
-        }
-        .product-name {
-            font-weight: bold;
-            color: #444;
-            line-height: 1.1;
-            font-size: 11pt;
-            display: inline-block;
-        }
-        .product-price {
-            color: #d35400;
-            font-weight: 600;
-            font-size: 11pt;
-            display: inline-block;
-        }
+{% block footer_note %}Prices and availability may change. Call to confirm stock before you visit.{% endblock %}
 
-        .page-break {
-            page-break-after: always;
-        }
+{% block extra_css %}
+  table.card { width: 100%; }
+  td.cardcell { border: 0.8pt solid #e3e7f0; background-color: #ffffff; padding: 0; }
+  .ph { background-color: #f1f3f8; text-align: center; padding: 7pt 0 5pt 0; }
+  .ph-none { background-color: #f1f3f8; text-align: center; height: 112pt; color: #9aa5bd; font-size: 8pt; padding-top: 50pt; }
+  .p-title { font-size: 8.5pt; font-weight: bold; color: #101b36; line-height: 1.3; padding: 8pt 9pt 1pt 9pt; }
+  .p-specs { font-size: 7.5pt; color: #5b6784; padding: 0 9pt 4pt 9pt; line-height: 1.3; }
+  .p-price { font-size: 13pt; font-weight: bold; color: #101b36; padding: 3pt 9pt 9pt 9pt; }
+  .tag-in { font-size: 7.5pt; font-weight: bold; color: #1b7a3d; }
+  .tag-out { font-size: 7.5pt; font-weight: bold; color: #b3261e; }
+{% endblock %}
 
-        footer {
-            font-size: 9pt;
-            color: #777;
-            border-top: 1px solid #ddd;
-            padding-top: 20px;
-            margin-top: 30px;
-            text-align: center;
-        }
+{% block content %}
+<div class="muted" style="margin-bottom:4pt">Browse our current range. Visit us in store, call or message us on WhatsApp to order.</div>
 
-        footer div {
-            margin-top: 5px;
-        }
-
-        footer p {
-            margin: 3px 0;
-            line-height: 1.2;
-        }
-
-        @media print {
-            header {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                max-width: 718px;
-                margin: 0 auto;
-                padding-top: 38px;
-            }
-            footer {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                width: 100%;
-                max-width: 718px;
-                margin: 0 auto;
-                padding-bottom: 38px;
-            }
-            .container {
-                margin-top: 120px;
-                margin-bottom: 100px;
-            }
-            .page-break {
-                page-break-after: always;
-                margin-bottom: 100px;
-            }
-        }
-
-        @page {
-            size: A4;
-            margin: 38px;
-        }
-    </style>
-</head>
-<body>
-<div class="container">
-    {% if products %}
-        <header>
-            <table>
-                <tr>
-                    <td style="text-align:left; vertical-align:top; padding-top:19px;">
-                        <div class="business-name">{{ business_name }}</div>
-                        <div class="business-details">
-                            {{ business_address }}<br>
-                            {{ business_contact }}
-                        </div>
-                    </td>
-                    <td align="right" valign="middle">
-                        <img src="{{ logo_path }}" alt="{{ business_name }} Logo" style="height:151px; display:block;">
-                    </td>
-                </tr>
-            </table>
-        </header>
-
-        <h2>Product Catalog</h2>
-        <table class="product-table">
-            <tbody>
-            {% for p in products %}
-                {% if loop.index0 is divisibleby 2 %}
-                    <tr>
-                {% endif %}
-                    <td>
-                        <div class="product-content">
-                            <div class="product-img-container">
-                                {% if p.image_path %}
-                                    <img src="{{ p.image_path }}" alt="{{ p.name }}" class="product-img"
-                                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                                    <div class="pseudo-img" style="display:none;">No Image</div>
-                                {% else %}
-                                    <div class="pseudo-img">No Image</div>
-                                {% endif %}
-                            </div>
-                            <div class="product-details">
-                                <p class="product-name-price">
-                                    <span class="product-name">{{ p.name }}</span><br>
-                                    <span class="product-price">Price: ${{ p.price | float | int if p.price | float == p.price | int else "%.2f"|format(p.price) }}</span>
-                                </p>
-                            </div>
-                        </div>
-                    </td>
-                {% if loop.index is divisibleby 2 or loop.last %}
-                    {% if loop.last and loop.index0 is not divisibleby 2 %}
-                        <td></td>
-                    {% endif %}
-                    </tr>
-                {% endif %}
-                {% if loop.index is divisibleby 6 or loop.last %}
-                    </tbody>
-                    </table>
-                    <footer>
-                        <p>Thank you for choosing {{ business_name }}!</p>
-                        <p>{{ business_contact }}</p>
-                        <p>&copy; {{ current_year }} {{ business_name }}. All rights reserved.</p>
-                    </footer>
-                    {% if not loop.last %}
-                        <div class="page-break"></div>
-                        <header>
-                            <table>
-                                <tr>
-                                    <td style="text-align:left; vertical-align:top; padding-top:19px;">
-                                        <div class="business-name">{{ business_name }}</div>
-                                        <div class="business-details">
-                                            {{ business_address }}<br>
-                                            {{ business_contact }}
-                                        </div>
-                                    </td>
-                                    <td align="right" valign="middle">
-                                        <img src="{{ logo_path }}" alt="{{ business_name }} Logo" style="height:151px; display:block;">
-                                    </td>
-                                </tr>
-                            </table>
-                        </header>
-                        <h2>Product Catalog</h2>
-                        <table class="product-table">
-                            <tbody>
-                    {% endif %}
-                {% endif %}
-            {% endfor %}
-        {% else %}
-            <header>
-                <table>
-                    <tr>
-                        <td style="text-align:left; vertical-align:top; padding-top:19px;">
-                            <div class="business-name">{{ business_name }}</div>
-                            <div class="business-details">
-                                {{ business_address }}<br>
-                                {{ business_contact }}
-                            </div>
-                        </td>
-                        <td align="right" valign="middle">
-                            <img src="{{ logo_path }}" alt="{{ business_name }} Logo" style="height:151px; display:block;">
-                        </td>
-                    </tr>
-                </table>
-            </header>
-            <h2>Product Catalog</h2>
-            <p>No products found.</p>
-            <div style="height: 15px; display: block;">&nbsp;</div>
-            <footer>
-                <div>
-                    <p style="visibility: hidden; height: 10px;">Spacer</p>
-                    <p>Thank you for choosing {{ business_name }}!</p>
-                    <p>&copy; {{ current_year }} {{ business_name }}. All rights reserved.</p>
-                </div>
-            </footer>
-        {% endif %}
-</div>
-</body>
-</html>
+{% for section in sections %}
+  <h2 class="section" style="-pdf-keep-with-next: true">{{ section.name }} <span class="muted small">({{ section.count }})</span></h2>
+  {% for row in section.rows %}
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      {% for i in range(3) %}
+      <td width="33%" style="padding: 0 4pt 8pt 4pt">
+        {% if row[i] is defined %}
+        {% set item = row[i] %}
+        <table class="card" cellpadding="0" cellspacing="0"><tr><td class="cardcell">
+          {% if item.image %}<div class="ph"><img src="{{ item.image }}" width="150" height="112"></div>{% else %}<div class="ph-none">No photo</div>{% endif %}
+          <div class="p-title">{{ item.title|pdftext(62) }}</div>
+          <div class="p-specs">{{ item.specs|join('  |  ')|pdftext }}&nbsp;</div>
+          <div class="p-price">{{ item.price|pdfmoney }}
+            &nbsp;&nbsp;{% if item.in_stock %}<span class="tag-in">In stock</span>{% else %}<span class="tag-out">Out of stock</span>{% endif %}</div>
+        </td></tr></table>
+        {% else %}&nbsp;{% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+  </table>
+  {% endfor %}
+{% endfor %}
+{% endblock %}

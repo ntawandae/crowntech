@@ -13,6 +13,12 @@
   <div class="card-body">
     <label for="customer_name">Customer name</label>
     <input type="text" id="customer_name" name="customer_name" required maxlength="100" placeholder="Who is this quote for?">
+    <div class="grid-2" style="margin-top:2px">
+      <div><label for="customer_email">Customer email <span class="hint" style="display:inline">(to send them the quotation)</span></label>
+        <input type="email" id="customer_email" name="customer_email" maxlength="120" placeholder="name@example.com" autocomplete="off"></div>
+      <div><label for="customer_phone">Customer phone (optional)</label>
+        <input type="text" id="customer_phone" name="customer_phone" maxlength="30" placeholder="+263 ..." autocomplete="off"></div>
+    </div>
 
     <label>Items</label>
     <div class="table-responsive" style="margin-bottom:10px">
@@ -40,6 +46,7 @@
       </div>
     </div>
     <input type="hidden" name="items" id="itemsJson">
+    <label class="check-row" style="display:flex;gap:10px;align-items:center;margin-top:12px;font-weight:500;cursor:pointer"><input type="checkbox" name="email_now" value="1" style="width:auto;margin:0"> Email this quotation to the customer when I save it</label>
     <div style="margin-top:14px"><button type="submit" class="btn-gold">{{ 'Save changes' if edit else 'Create quotation' }}</button></div>
   </div>
 </form>
@@ -58,13 +65,16 @@
           {% if side == 'admin' %}<td data-label="By">{{ q.created_by.full_name if q.created_by else '-' }}</td>{% endif %}
           <td data-label="Date">{{ q.created_at.strftime('%d %b %Y') if q.created_at else '' }}</td>
           <td class="r num" data-label="Total">${{ "%.2f"|format(q.total_price - (q.discount or 0)) }}{% if q.discount %}<div class="hint">after ${{ "%.2f"|format(q.discount) }} off</div>{% endif %}</td>
-          <td data-label="Status">{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}</td>
+          <td data-label="Status">{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}{% if q.emailed_at %}<div class="hint">Emailed {{ q.emailed_at.strftime('%d %b') }}</div>{% endif %}</td>
           <td class="r full" style="white-space:nowrap">
             <a class="btn btn-ghost btn-sm" href="{{ url_for(side ~ '.download_quotation', quotation_id=q.id) }}">PDF</a>
+            {% if side == 'admin' or q.created_by_id == current_user.id %}
+            <button type="button" class="btn-ghost btn-sm" data-email="{{ q.customer_email or '' }}" data-name="{{ q.customer_name or '' }}" data-number="{{ q.quotation_number }}" data-url="{{ url_for(side ~ '.send_quotation_email', quotation_id=q.id) }}" onclick="openEmail(this)">Email</button>
+            {% endif %}
             {% if not q.converted %}
               <a class="btn btn-ghost btn-sm" href="{{ url_for(side ~ '.edit_quotation', quotation_id=q.id) }}">Edit</a>
               {% if side == 'admin' or q.created_by_id == current_user.id %}
-              <button type="button" class="btn-gold btn-sm" onclick="openConvert({{ q.id }}, '{{ q.quotation_number }}', '{{ url_for(side ~ '.convert_quotation', quotation_id=q.id) }}')">Convert to sale</button>
+              <button type="button" class="btn-gold btn-sm" data-email="{{ q.customer_email or '' }}" data-phone="{{ q.customer_phone or '' }}" onclick="openConvert({{ q.id }}, '{{ q.quotation_number }}', '{{ url_for(side ~ '.convert_quotation', quotation_id=q.id) }}', this)">Convert to sale</button>
               {% endif %}
             {% endif %}
           </td>
@@ -77,13 +87,27 @@
   </div>
 </div>
 
+<div class="modal" id="emailModal">
+  <div class="modal-content">
+    <button type="button" class="close" onclick="closeEmail()" aria-label="Close">&times;</button>
+    <h3 id="emailTitle">Email quotation</h3>
+    <p class="hint">The customer gets a ready-written message with a secure link to the PDF{% if config.get('ALIYUN_DM_ACCESS_KEY_ID') %}.{% else %}, and the PDF attached.{% endif %}</p>
+    <form method="POST" id="emailForm">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <label for="emailTo">Customer email</label><input type="email" name="email" id="emailTo" required maxlength="120">
+      <label for="emailNote">Personal note (optional)</label><textarea name="note" id="emailNote" maxlength="600" rows="3" placeholder="e.g. Delivery is free within Harare."></textarea>
+      <div class="modal-buttons"><button type="submit" class="btn-gold">Send quotation</button><button type="button" class="btn-ghost" onclick="closeEmail()">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
 <div class="modal" id="convertModal">
   <div class="modal-content">
     <button type="button" class="close" onclick="closeConvert()" aria-label="Close">&times;</button>
     <h3 id="convertTitle">Convert to sale</h3>
     <p class="hint">Stock is taken and a receipt is created at the quoted prices and discount.</p>
     <form method="POST" id="convertForm">
-      <label>Customer email (optional)</label><input type="email" name="customer_email">
+      <label>Customer email (optional - their receipt is emailed automatically)</label><input type="email" name="customer_email">
       <label>Customer phone (optional)</label><input type="text" name="customer_phone">
       <label>Delivery fee (optional)</label><input type="number" name="delivery_fee" min="0" step="0.01" value="0">
       <div class="modal-buttons"><button type="submit" class="btn-gold">Convert and download receipt</button><button type="button" class="btn-ghost" onclick="closeConvert()">Cancel</button></div>
@@ -164,12 +188,23 @@ $('quoteForm').addEventListener('submit', e => {
 
 if (EDIT) {
   $('customer_name').value = EDIT.customer;
+  $('customer_email').value = EDIT.email || ''; $('customer_phone').value = EDIT.phone || '';
   EDIT.items.forEach(addRow);
   $('discountValue').value = EDIT.discount;
 } else { addRow(); }
 update();
 
-function openConvert(id, number, url) { $('convertTitle').textContent = 'Convert ' + number + ' to a sale'; $('convertForm').action = url; $('convertModal').style.display = 'flex'; }
+function openConvert(id, number, url, btn) {
+  $('convertTitle').textContent = 'Convert ' + number + ' to a sale'; $('convertForm').action = url;
+  const f = $('convertForm'); f.querySelector('[name=customer_email]').value = (btn && btn.dataset.email) || ''; f.querySelector('[name=customer_phone]').value = (btn && btn.dataset.phone) || '';
+  $('convertModal').style.display = 'flex';
+}
+function openEmail(btn) {
+  $('emailTitle').textContent = 'Email ' + btn.dataset.number + (btn.dataset.name ? ' to ' + btn.dataset.name : '');
+  $('emailForm').action = btn.dataset.url; $('emailTo').value = btn.dataset.email || ''; $('emailNote').value = '';
+  $('emailModal').style.display = 'flex'; $('emailTo').focus();
+}
+function closeEmail() { $('emailModal').style.display = 'none'; }
 function closeConvert() { $('convertModal').style.display = 'none'; }
 </script>
 {% endblock %}

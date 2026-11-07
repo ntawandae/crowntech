@@ -1,0 +1,20 @@
+Hello {{ name or 'there' }},
+
+Thank you for your interest in {{ biz_name }}. As requested, here is your quotation {{ q.quotation_number }}.
+{% if note %}
+{{ note }}
+{% endif %}
+{% for i in q.items %}- {{ i.product_name|pdftext(80) }} x {{ i.quantity }}: {{ i.total_price|money }}
+{% endfor %}{% if q.discount %}Discount: -{{ q.discount|money }}
+{% endif %}Total: {{ total|money }}
+{% if valid_until %}
+This quotation is valid until {{ valid_until.strftime('%d %B %Y') }}. Prices are in US dollars.
+{% endif %}
+View your quotation (PDF): {{ link }}
+{% if attached %}A PDF copy is also attached to this email.
+{% endif %}
+To go ahead, simply reply to this email or call us on {{ phones[0] if phones else biz_phone }}{% if biz_whatsapp %} or WhatsApp +{{ biz_whatsapp }}{% endif %}.
+
+Kind regards,
+{{ sender_name }}
+{{ biz_name }}

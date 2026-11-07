@@ -122,5 +122,14 @@
 })();
 </script>
 {% block scripts %}{% endblock %}
+<script>
+  /* "Email" next to a receipt: ask who to send it to, then post the small form */
+  function askEmail(form, current) {
+    var to = window.prompt('Send this receipt to which email address?', current || '');
+    if (!to || to.indexOf('@') < 1) { return false; }
+    form.elements['email'].value = to.trim();
+    return true;
+  }
+</script>
 </body>
 </html>

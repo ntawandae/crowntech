@@ -65,7 +65,22 @@ def parse_quote_form(form, max_discount_percent=0):
     return customer, items, pricing["discount"]
 
 
-def save_quotation(user, customer, items, discount, quotation=None):
+_EMAIL_OK = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_UNSET = object()
+
+
+def parse_contact(form):
+    """The optional customer email and phone on the quotation form. Returns (email or None, phone or None)."""
+    email = (form.get("customer_email") or "").strip().lower()
+    phone = " ".join((form.get("customer_phone") or "").split())
+    if email and not (_EMAIL_OK.match(email) and len(email) <= 120):
+        raise PricingError("That customer email address doesn't look right.")
+    if len(phone) > 30:
+        raise PricingError("The customer phone number is too long.")
+    return email or None, phone or None
+
+
+def save_quotation(user, customer, items, discount, quotation=None, email=_UNSET, phone=_UNSET):
     """Create a quotation, or replace the items/discount of an existing one."""
     from .. import db
     from ..models import Quotation, QuotationItem
@@ -76,6 +91,10 @@ def save_quotation(user, customer, items, discount, quotation=None):
                               created_at=zim_now())
         db.session.add(quotation)
     quotation.customer_name = customer
+    if email is not _UNSET:
+        quotation.customer_email = email
+    if phone is not _UNSET:
+        quotation.customer_phone = phone
     quotation.discount = float(discount)
     quotation.items.clear()
     db.session.flush()
@@ -91,6 +110,8 @@ def quotation_edit_payload(quotation):
     """What the edit form needs to pre-fill itself."""
     return {
         "customer": quotation.customer_name or "",
+        "email": quotation.customer_email or "",
+        "phone": quotation.customer_phone or "",
         "discount": float(quotation.discount or 0),
         "items": [{"product_id": it.product_id, "product_name": it.product_name,
                    "quantity": it.quantity, "unit_price": float(it.unit_price)} for it in quotation.items],

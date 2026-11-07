@@ -654,6 +654,31 @@ def order_receipt(order_number):
                      mimetype="application/pdf")
 
 
+@shop_bp.route("/documents/<token>.pdf")
+def document_pdf(token):
+    """The PDF behind a link we emailed (quotation or receipt). The signed link is the only credential."""
+    from ..models import Quotation, Receipt
+    from ..services import documents
+    from ..utils.receipts import quotation_pdf, receipt_items, receipt_pdf
+    found = documents.read_link(token)
+    if not found:
+        abort(404)
+    kind, obj_id = found
+    if kind == "q":
+        quotation = db.session.get(Quotation, obj_id) or abort(404)
+        pdf = quotation_pdf(quotation, (quotation.created_by.full_name if quotation.created_by else None) or current_app.config["BUSINESS_NAME"])
+        filename = f"Quotation_{quotation.quotation_number}.pdf"
+    else:
+        receipt = db.session.get(Receipt, obj_id) or abort(404)
+        pdf = receipt_pdf(receipt, receipt_items(receipt), documents._served_by(receipt))
+        filename = f"Receipt_{receipt.receipt_number}.pdf"
+    if pdf is None:
+        abort(500)
+    response = send_file(pdf, mimetype="application/pdf", download_name=filename, as_attachment=False)
+    response.headers["X-Robots-Tag"] = "noindex"
+    return response
+
+
 @shop_bp.route("/track", methods=["GET", "POST"])
 def track():
     if request.method == "POST":
