@@ -19,7 +19,7 @@
             let input = document.getElementById("searchInput").value.toLowerCase();
             let rows = document.querySelectorAll("#productTable tbody tr");
             rows.forEach(row => {
-                let name = row.cells[1].innerText.toLowerCase();
+                let name = row.cells[0].innerText.toLowerCase();
                 row.style.display = name.includes(input) ? "" : "none";
             });
         }
@@ -38,30 +38,24 @@
     </script>
 {% endblock %}
 {% block content %}
-<!-- Flash Messages -->
-
-
-<h2>Product Inventory</h2>
-<input type="text" id="searchInput" onkeyup="debouncedFilterTable()" placeholder="Search product by name...">
+<div class="page-head"><div><h1>Inventory</h1><p>{{ products|length }} products. Quantity in stock and selling price.</p></div></div>
+<input type="search" id="searchInput" onkeyup="debouncedFilterTable()" placeholder="Search product by name..." aria-label="Search products">
 {% if products %}
-<table id="productTable" class="product-table">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Qty</th>
-            <th>Price</th>
-        </tr>
-    </thead>
+<div class="inv-wrap">
+<table id="productTable" class="inv-table">
+    <colgroup><col><col class="c-qty"><col class="c-price"></colgroup>
+    <thead><tr><th>Name</th><th class="r">Qty</th><th class="r">Price</th></tr></thead>
     <tbody>
         {% for p in products %}
         <tr id="product-{{ p.id }}">
-            <td class="product-name">{{ p.name }}</td>
-            <td class="product-quantity {% if p.quantity < 5 %}low-stock{% endif %}">{{ p.quantity }}</td>
-            <td class="product-price">${{ "%.2f" | format(p.price) }}</td>
+            <td class="product-name" title="{{ p.name }}">{{ p.name }}</td>
+            <td class="r product-quantity"><span class="stock-pill {{ 'out' if p.quantity < 1 else ('low' if p.quantity < 5) }}">{{ p.quantity }}</span></td>
+            <td class="r num product-price">${{ "%.2f" | format(p.price) }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
     <p>No products found.</p>
 {% endif %}

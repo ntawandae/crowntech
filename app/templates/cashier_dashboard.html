@@ -21,18 +21,19 @@ function filterTable() {
 <div class="pos">
   <!-- ============ products ============ -->
   <section class="card pos-products">
-    <div class="card-header">Stock</div>
+    <div class="card-header">Stock <span class="muted small" style="font-weight:600;margin-left:6px">{{ products|length }} products</span></div>
     <div class="card-body">
       <input type="search" id="searchInput" onkeyup="filterTable()" placeholder="Search products by name..." aria-label="Search products">
-      <div class="table-scroll table-responsive" style="margin:0">
-        <table id="productTable" class="stack-sm">
-          <thead><tr><th>Product</th><th>In stock</th><th class="r">Price</th><th></th></tr></thead>
+      <div class="pos-list" tabindex="0" aria-label="Products (scroll to see more)">
+        <table id="productTable" class="pos-table">
+          <colgroup><col><col class="c-qty"><col class="c-price"><col class="c-add"></colgroup>
+          <thead><tr><th>Product</th><th class="r">Qty</th><th class="r">Price</th><th></th></tr></thead>
           <tbody>
           {% for p in products %}
             <tr>
-              <td class="product-name" title="{{ p.name }}">{{ p.name[:80] }}</td>
-              <td data-label="In stock"><span class="stock-pill {{ 'out' if p.quantity < 1 else ('low' if p.quantity <= 2) }}">{{ p.quantity }}</span></td>
-              <td class="r num" data-label="Price">${{ '%.2f' % p.price }}</td>
+              <td class="product-name" title="{{ p.name }}">{{ p.name }}</td>
+              <td class="r"><span class="stock-pill {{ 'out' if p.quantity < 1 else ('low' if p.quantity <= 2) }}">{{ p.quantity }}</span></td>
+              <td class="r num">${{ '%.2f' % p.price }}</td>
               <td class="r">
                 <form method="POST" class="js-cart" action="{{ url_for('cashier.add_one_to_cart', product_id=p.id) }}">
                   <button type="submit" class="btn-sm" {% if p.quantity < 1 %}disabled{% endif %}>Add</button>
@@ -123,7 +124,7 @@ function filterTable() {
 
 <!-- ============ back-office requests ============ -->
 <div class="grid-2" style="margin-top:20px">
-  <section class="card">
+  <section class="card" id="stock-request">
     <div class="card-header">Stock request</div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('cashier.stock_request') }}">
@@ -138,7 +139,7 @@ function filterTable() {
       </form>
     </div>
   </section>
-  <section class="card">
+  <section class="card" id="defect-request">
     <div class="card-header">Defect removal request</div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('cashier.submit_defect') }}">
@@ -150,7 +151,7 @@ function filterTable() {
       </form>
     </div>
   </section>
-  <section class="card">
+  <section class="card" id="record-expense">
     <div class="card-header">Record expense</div>
     <div class="card-body">
       <form method="POST" class="once" action="{{ url_for('cashier.record_expense') }}">
@@ -160,7 +161,7 @@ function filterTable() {
       </form>
     </div>
   </section>
-  <section class="card">
+  <section class="card" id="record-income">
     <div class="card-header">Record extra income</div>
     <div class="card-body">
       <form method="POST" class="once" action="{{ url_for('cashier.record_income') }}">

@@ -4,6 +4,7 @@ Helper for Supabase Storage. Run from the project folder with your Supabase sett
 
     python tools/supabase_storage.py check      # creates the buckets if needed and tests upload / link / delete
     python tools/supabase_storage.py migrate    # copies photos + contracts still on this machine's disk to Supabase
+    python tools/supabase_storage.py reframe    # rebuilds the card/large frames from the kept originals (after a framing change)
 
 `migrate` only has something to copy if the files are on the machine you run it from (for example your own
 computer with a copy of the project's static/uploads and instance/contracts folders). It is safe to run twice.
@@ -101,11 +102,33 @@ def migrate():
     return 0
 
 
+def reframe():
+    """Rebuild every card/large frame from the original kept in the bucket (photos uploaded since originals were kept)."""
+    if not storage.enabled():
+        print("SUPABASE_URL and SUPABASE_SERVICE_KEY are not set.")
+        return 1
+    names = {p.image_filename for p in Product.query.all() if p.image_filename}
+    names |= {i.filename for i in ProductImage.query.all() if i.filename}
+    done = skipped = 0
+    for name in sorted(names):
+        data = storage.download_public(storage.bucket_products(), photos.original_key(name))
+        if not data:
+            skipped += 1
+            continue
+        for size in images.SIZES:
+            storage.upload(storage.bucket_products(), photos.variant_key(size, name),
+                           images.frame_bytes(io.BytesIO(data), size), "image/jpeg", cache_seconds=3600)
+        done += 1
+        print("reframed:", name)
+    print(f"{done} photos reframed, {skipped} have no kept original (upload those again to get the new look).")
+    return 0
+
+
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else ""
-    if command not in ("check", "migrate"):
+    if command not in ("check", "migrate", "reframe"):
         print(__doc__)
         sys.exit(2)
     flask_app = create_app()
     with flask_app.app_context():
-        sys.exit(check() if command == "check" else migrate())
+        sys.exit({"check": check, "migrate": migrate, "reframe": reframe}[command]())

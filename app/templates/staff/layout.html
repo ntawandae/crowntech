@@ -70,6 +70,11 @@
     <div class="side-group">Records</div>
     {{ item(url_for('cashier.daily_report'), 'chart', 'Daily report', nav_ep == 'cashier.daily_report') }}
     {{ item(url_for('cashier.my_requests'), 'inbox', 'My requests', nav_ep == 'cashier.my_requests') }}
+    <div class="side-group">Quick actions</div>
+    {{ item(url_for('cashier.cashier_dashboard') ~ '#stock-request', 'plus', 'Stock request', false) }}
+    {{ item(url_for('cashier.cashier_dashboard') ~ '#defect-request', 'box', 'Defect removal', false) }}
+    {{ item(url_for('cashier.cashier_dashboard') ~ '#record-expense', 'wallet', 'Record expense', false) }}
+    {{ item(url_for('cashier.cashier_dashboard') ~ '#record-income', 'receipt', 'Record extra income', false) }}
   {% endif %}
   </nav>
   <div class="side-foot">
@@ -113,6 +118,10 @@
   <button type="button" onclick="document.body.classList.toggle('nav-open')" aria-label="More"><svg class="i"><use href="#i-menu"/></svg>More</button>
 </nav>
 <button type="button" class="to-top" id="toTop" aria-label="Back to top"><svg class="i"><use href="#i-up"/></svg></button>
+<script>
+  /* a tapped menu link closes the slide-out menu (matters for the in-page quick actions) */
+  document.querySelectorAll('.sidebar a').forEach(function (a) { a.addEventListener('click', function () { document.body.classList.remove('nav-open'); }); });
+</script>
 <script>
 (function () {
   const b = document.getElementById('toTop');

@@ -100,7 +100,7 @@ def cashier_dashboard():
 @login_required
 @cashier_required
 def inventory():
-    products = Product.query.all()
+    products = Product.query.order_by(Product.name.asc()).all()
     logger.debug(f"Rendering inventory page for user {current_user.id}, products found: {len(products)}")
     return render_template('inventory.html', products=products)
 

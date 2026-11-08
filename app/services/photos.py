@@ -25,6 +25,11 @@ def variant_key(size, filename):
     return f"{size}/{_stem(filename)}.jpg"
 
 
+def original_key(filename):
+    """A resized copy of the upload, kept in the bucket so photos can be re-framed without re-uploading."""
+    return f"orig/{_stem(filename)}.jpg"
+
+
 def _local_path(filename):
     return os.path.join(current_app.config["UPLOAD_FOLDER"], os.path.basename(filename))
 
@@ -38,6 +43,7 @@ def store_product_photo(stream, filename):
         for size in images.SIZES:
             storage.upload(storage.bucket_products(), variant_key(size, filename),
                            images.frame_bytes(io.BytesIO(data), size), "image/jpeg")
+        storage.upload(storage.bucket_products(), original_key(filename), images.original_bytes(io.BytesIO(data)), "image/jpeg")
         return
     os.makedirs(current_app.config["UPLOAD_FOLDER"], exist_ok=True)
     stream.seek(0)
@@ -82,8 +88,9 @@ def remove_product_photo(filename):
     if not filename:
         return
     name = os.path.basename(filename)
-    paths = [_local_path(name)] + [images._cache_path(os.path.join(current_app.instance_path, "thumbs"), s, name)
-                                   for s in images.SIZES]
+    cache = os.path.join(current_app.instance_path, "thumbs")
+    paths = [_local_path(name)] + [images._cache_path(cache, s, name) for s in images.SIZES]
+    paths += [os.path.join(cache, s, _stem(name) + ".jpg") for s in images.SIZES]      # frames cached by older versions
     for path in paths:
         try:
             if os.path.isfile(path):
@@ -92,6 +99,6 @@ def remove_product_photo(filename):
             log.warning("Could not remove %s", path)
     if storage.enabled():
         try:
-            storage.delete(storage.bucket_products(), [variant_key(s, name) for s in images.SIZES])
+            storage.delete(storage.bucket_products(), [variant_key(s, name) for s in images.SIZES] + [original_key(name)])
         except storage.StorageError as exc:
             log.warning("Could not remove %s from Supabase: %s", name, exc)
