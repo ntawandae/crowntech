@@ -37,7 +37,11 @@
                                 <form method="POST" action="{{ url_for('admin.send_receipt_email', receipt_id=sale.receipt.id) }}" style="display:inline" onsubmit="return askEmail(this, this.dataset.email)" data-email="{{ sale.receipt.customer_email or '' }}">
                                     <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="email"><input type="hidden" name="next" value="{{ request.full_path }}">
                                     <button type="submit" class="btn btn-sm" title="Email this receipt to the customer" style="padding:2px 8px;font-size:.78rem">Email</button>
-                                </form>{% if sale.receipt.emailed_at %} <span title="Emailed {{ sale.receipt.emailed_at.strftime('%d %b %H:%M') }}" style="color:#16a34a">&#10003;</span>{% endif %}{% else %}N/A{% endif %}</td>
+                                </form>{% if sale.receipt.emailed_at %} <span title="Emailed {{ sale.receipt.emailed_at.strftime('%d %b %H:%M') }}" style="color:#16a34a">&#10003;</span>{% endif %}
+                                <form method="POST" action="{{ url_for('admin.send_receipt_whatsapp', receipt_id=sale.receipt.id) }}" style="display:inline" onsubmit="return askPhone(this, this.dataset.phone)" data-phone="{{ sale.receipt.customer_phone or '' }}">
+                                    <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="phone"><input type="hidden" name="next" value="{{ request.full_path }}">
+                                    <button type="submit" class="btn btn-sm" title="Send this receipt to the customer on WhatsApp" style="padding:2px 8px;font-size:.78rem">WhatsApp</button>
+                                </form>{% if sale.receipt.whatsapped_at %} <span title="Sent on WhatsApp {{ sale.receipt.whatsapped_at.strftime('%d %b %H:%M') }}" style="color:#16a34a">&#10003;</span>{% endif %}{% else %}N/A{% endif %}</td>
                         <td>{{ sale.product.name }}</td>
                         <td>{{ sale.quantity }}</td>
                         <td>{{ "%.2f"|format(sale.total_price) }}</td>

@@ -21,11 +21,13 @@ NEW_COLUMNS = {
         ("delivery_fee", "FLOAT DEFAULT 0"),
         ("delivery_address", "VARCHAR(300)"),
         ("emailed_at", "TIMESTAMP"),
+        ("whatsapped_at", "TIMESTAMP"),
     ],
     "quotation": [
         ("customer_email", "VARCHAR(120)"),
         ("customer_phone", "VARCHAR(30)"),
         ("emailed_at", "TIMESTAMP"),
+        ("whatsapped_at", "TIMESTAMP"),
     ],
 }
 

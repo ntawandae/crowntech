@@ -139,6 +139,13 @@
     form.elements['email'].value = to.trim();
     return true;
   }
+  /* "WhatsApp" next to a receipt: ask for the customer's number, then post the small form */
+  function askPhone(form, current) {
+    var to = window.prompt("Send this receipt to which WhatsApp number? (e.g. 0772 123 456)", current || '');
+    if (!to || to.replace(/\D/g, '').length < 9) { return false; }
+    form.elements['phone'].value = to.trim();
+    return true;
+  }
 </script>
 </body>
 </html>

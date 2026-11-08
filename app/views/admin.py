@@ -919,6 +919,12 @@ def quotations():
                     ok, msg = documents.email_quotation(q, email, current_user)
                     flash(f"Quotation {q.quotation_number}: {msg}" if ok else f"The quotation was saved, but it could not be emailed. {msg}",
                           "success" if ok else "warning")
+            if request.form.get('whatsapp_now'):
+                ok, msg, wa_url = documents.whatsapp_quotation(q, request.form.get('customer_phone'), current_user)
+                if wa_url:
+                    return redirect(wa_url)
+                flash(f"Quotation {q.quotation_number}: {msg}" if ok else f"The quotation was saved, but it could not be sent on WhatsApp. {msg}",
+                      "success" if ok else "warning")
         except PricingError as exc:
             flash(str(exc), "danger")
         except Exception:
@@ -983,6 +989,32 @@ def send_receipt_email(receipt_id):
     return redirect(safe_next(request.form.get('next'), url_for('admin.view_sales')))
 
 
+@admin_bp.route('/quotations/<int:quotation_id>/whatsapp', methods=['POST'])
+@login_required
+def send_quotation_whatsapp(quotation_id):
+    from ..security import verify_csrf
+    verify_csrf()
+    quotation = Quotation.query.get_or_404(quotation_id)
+    ok, msg, wa_url = documents.whatsapp_quotation(quotation, request.form.get('phone'), current_user, request.form.get('note', ''))
+    if wa_url:
+        return redirect(wa_url)
+    flash(f"Quotation {quotation.quotation_number}: {msg}" if ok else msg, "success" if ok else "danger")
+    return redirect(url_for('admin.quotations'))
+
+
+@admin_bp.route('/receipt/<int:receipt_id>/whatsapp', methods=['POST'])
+@login_required
+def send_receipt_whatsapp(receipt_id):
+    from ..security import verify_csrf
+    verify_csrf()
+    receipt = Receipt.query.get_or_404(receipt_id)
+    ok, msg, wa_url = documents.whatsapp_receipt(receipt, request.form.get('phone'))
+    if wa_url:
+        return redirect(wa_url)
+    flash(f"Receipt {receipt.receipt_number}: {msg}" if ok else msg, "success" if ok else "danger")
+    return redirect(safe_next(request.form.get('next'), url_for('admin.view_sales')))
+
+
 @admin_bp.route('/quotations/<int:quotation_id>/convert', methods=['POST'])
 @login_required
 def convert_quotation(quotation_id):
@@ -1007,6 +1039,9 @@ def convert_quotation(quotation_id):
     emailed = documents.auto_email_receipt(receipt)
     if emailed:
         flash(emailed, "success")
+    wa = documents.auto_whatsapp_receipt(receipt)
+    if wa:
+        flash(wa, "success")
     pdf = receipt_pdf(receipt, result['items'], current_user.full_name)
     if pdf is None:
         flash("The receipt PDF could not be created: reprint it from Sales.", "warning")

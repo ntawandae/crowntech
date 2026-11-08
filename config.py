@@ -119,6 +119,20 @@ class Config:
     EMAIL_LINK_HOURS_VERIFY = int(os.environ.get("EMAIL_LINK_HOURS_VERIFY", "24"))
     EMAIL_LINK_MINUTES_RESET = int(os.environ.get("EMAIL_LINK_MINUTES_RESET", "60"))
 
+    # --- WhatsApp (Meta WhatsApp Business Cloud API) -----------------------------------
+    # Leave WHATSAPP_TOKEN empty to use the fallback: a "click to chat" link that opens WhatsApp with the message ready.
+    WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN", "").strip()                      # permanent System User token
+    WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "").strip()  # NOT the phone number itself
+    WHATSAPP_API_VERSION = os.environ.get("WHATSAPP_API_VERSION", "v21.0").strip()
+    # Approved templates with a PDF DOCUMENT header and 3 body variables: {{1}} customer, {{2}} number, {{3}} total.
+    # Without a template name the PDF is sent as a plain message, which WhatsApp only delivers inside the 24-hour window.
+    WHATSAPP_TEMPLATE_QUOTATION = os.environ.get("WHATSAPP_TEMPLATE_QUOTATION", "").strip()
+    WHATSAPP_TEMPLATE_RECEIPT = os.environ.get("WHATSAPP_TEMPLATE_RECEIPT", "").strip()
+    WHATSAPP_TEMPLATE_LANG = os.environ.get("WHATSAPP_TEMPLATE_LANG", "en").strip()   # must match the template, e.g. en or en_US
+    WHATSAPP_DEFAULT_COUNTRY = os.environ.get("WHATSAPP_DEFAULT_COUNTRY", "263").strip()  # for numbers typed like 077...
+    WHATSAPP_AUTO_RECEIPT = _env_bool("WHATSAPP_AUTO_RECEIPT", False)  # send the receipt automatically when a phone is entered at a sale
+    WHATSAPP_TIMEOUT = int(os.environ.get("WHATSAPP_TIMEOUT", "30"))
+
     # --- Sign in with Google (customers only) ----------------------------------------
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()

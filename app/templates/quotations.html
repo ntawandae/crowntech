@@ -47,6 +47,7 @@
     </div>
     <input type="hidden" name="items" id="itemsJson">
     <label class="check-row" style="display:flex;gap:10px;align-items:center;margin-top:12px;font-weight:500;cursor:pointer"><input type="checkbox" name="email_now" value="1" style="width:auto;margin:0"> Email this quotation to the customer when I save it</label>
+    <label class="check-row" style="display:flex;gap:10px;align-items:center;margin-top:8px;font-weight:500;cursor:pointer"><input type="checkbox" name="whatsapp_now" value="1" style="width:auto;margin:0"> Send this quotation on WhatsApp (to the phone number above) when I save it</label>
     <div style="margin-top:14px"><button type="submit" class="btn-gold">{{ 'Save changes' if edit else 'Create quotation' }}</button></div>
   </div>
 </form>
@@ -65,11 +66,12 @@
           {% if side == 'admin' %}<td data-label="By">{{ q.created_by.full_name if q.created_by else '-' }}</td>{% endif %}
           <td data-label="Date">{{ q.created_at.strftime('%d %b %Y') if q.created_at else '' }}</td>
           <td class="r num" data-label="Total">${{ "%.2f"|format(q.total_price - (q.discount or 0)) }}{% if q.discount %}<div class="hint">after ${{ "%.2f"|format(q.discount) }} off</div>{% endif %}</td>
-          <td data-label="Status">{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}{% if q.emailed_at %}<div class="hint">Emailed {{ q.emailed_at.strftime('%d %b') }}</div>{% endif %}</td>
+          <td data-label="Status">{% if q.converted %}<span class="badge badge-ok">Sold</span>{% else %}<span class="badge badge-warn">Open</span>{% endif %}{% if q.emailed_at %}<div class="hint">Emailed {{ q.emailed_at.strftime('%d %b') }}</div>{% endif %}{% if q.whatsapped_at %}<div class="hint">WhatsApp {{ q.whatsapped_at.strftime('%d %b') }}</div>{% endif %}</td>
           <td class="r full" style="white-space:nowrap">
             <a class="btn btn-ghost btn-sm" href="{{ url_for(side ~ '.download_quotation', quotation_id=q.id) }}">PDF</a>
             {% if side == 'admin' or q.created_by_id == current_user.id %}
             <button type="button" class="btn-ghost btn-sm" data-email="{{ q.customer_email or '' }}" data-name="{{ q.customer_name or '' }}" data-number="{{ q.quotation_number }}" data-url="{{ url_for(side ~ '.send_quotation_email', quotation_id=q.id) }}" onclick="openEmail(this)">Email</button>
+            <button type="button" class="btn-ghost btn-sm" data-phone="{{ q.customer_phone or '' }}" data-name="{{ q.customer_name or '' }}" data-number="{{ q.quotation_number }}" data-url="{{ url_for(side ~ '.send_quotation_whatsapp', quotation_id=q.id) }}" onclick="openWa(this)">WhatsApp</button>
             {% endif %}
             {% if not q.converted %}
               <a class="btn btn-ghost btn-sm" href="{{ url_for(side ~ '.edit_quotation', quotation_id=q.id) }}">Edit</a>
@@ -97,6 +99,20 @@
       <label for="emailTo">Customer email</label><input type="email" name="email" id="emailTo" required maxlength="120">
       <label for="emailNote">Personal note (optional)</label><textarea name="note" id="emailNote" maxlength="600" rows="3" placeholder="e.g. Delivery is free within Harare."></textarea>
       <div class="modal-buttons"><button type="submit" class="btn-gold">Send quotation</button><button type="button" class="btn-ghost" onclick="closeEmail()">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="waModal">
+  <div class="modal-content">
+    <button type="button" class="close" onclick="closeWa()" aria-label="Close">&times;</button>
+    <h3 id="waTitle">Send quotation on WhatsApp</h3>
+    <p class="hint">{% if config.get('WHATSAPP_TOKEN') %}The quotation PDF is sent straight to the customer's WhatsApp. Nothing to download.{% else %}WhatsApp opens with the customer's number and the message ready. Press Send there.{% endif %}</p>
+    <form method="POST" id="waForm">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <label for="waTo">Customer WhatsApp number</label><input type="tel" name="phone" id="waTo" required maxlength="30" placeholder="0772 123 456 or +263 77 212 3456">
+      <label for="waNote">Personal note (optional)</label><textarea name="note" id="waNote" maxlength="600" rows="3" placeholder="e.g. Delivery is free within Harare."></textarea>
+      <div class="modal-buttons"><button type="submit" class="btn-gold">Send on WhatsApp</button><button type="button" class="btn-ghost" onclick="closeWa()">Cancel</button></div>
     </form>
   </div>
 </div>
@@ -205,6 +221,12 @@ function openEmail(btn) {
   $('emailModal').style.display = 'flex'; $('emailTo').focus();
 }
 function closeEmail() { $('emailModal').style.display = 'none'; }
+function openWa(btn) {
+  $('waTitle').textContent = 'WhatsApp ' + btn.dataset.number + (btn.dataset.name ? ' to ' + btn.dataset.name : '');
+  $('waForm').action = btn.dataset.url; $('waTo').value = btn.dataset.phone || ''; $('waNote').value = '';
+  $('waModal').style.display = 'flex'; $('waTo').focus();
+}
+function closeWa() { $('waModal').style.display = 'none'; }
 function closeConvert() { $('convertModal').style.display = 'none'; }
 </script>
 {% endblock %}
