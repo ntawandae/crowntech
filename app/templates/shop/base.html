@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}{{ biz.name }}{% endblock %}</title>
   <meta name="description" content="{% block desc %}Laptops, phones and accessories from {{ biz.name }}. Order online and pay with Paynow or PayPal, or reserve and pay at the shop.{% endblock %}">
-  <link rel="icon" href="{{ url_for('static', filename='images/cth_mark.png') }}">
+  <link rel="icon" href="{{ url_for('static', filename='images/cth_icon.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -19,6 +19,8 @@
   <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></symbol>
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
   <symbol id="i-headset" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.5L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></symbol>
   <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8z"/><path d="m3 8 9 5 9-5M12 13v8"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
   <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/></symbol>
@@ -52,20 +54,28 @@
 
 {% block header %}
 <div class="topbar"><div class="wrap">
-  <span class="tb-left">{% if biz.phone %}Call {{ biz.phone }}{% elif biz.whatsapp %}WhatsApp +{{ biz.whatsapp }}{% else %}{{ biz.name }}{% endif %}</span>
-  <span class="tb-mid">Pay with Paynow, PayPal or at the shop</span>
-  <span class="tb-right"><a href="{{ url_for('shop.track') }}">Track order</a></span>
+  <span class="tb-left"><svg class="ic"><use href="#i-card"/></svg>Pay with Paynow, PayPal or at the shop</span>
+  <span class="tb-right">
+    {% if biz.phone %}<a href="tel:{{ biz.phone }}">{{ biz.phone }}</a>{% elif biz.whatsapp %}<a href="https://wa.me/{{ biz.whatsapp }}" rel="noopener">WhatsApp +{{ biz.whatsapp }}</a>{% endif %}
+    <a href="{{ url_for('shop.track') }}"><svg class="ic"><use href="#i-truck"/></svg>Track order</a>
+  </span>
 </div></div>
 
 <header class="site-head">
   <div class="wrap head-row">
     <button class="nav-toggle" id="navToggle" type="button" aria-label="Open menu" aria-controls="drawer" aria-expanded="false"><svg class="ic"><use href="#i-menu"/></svg></button>
-    <a class="brand" href="{{ url_for('shop.home') }}">
-      <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="40" height="40">
-      <span>{{ biz.name }}</span>
+    <a class="brand" href="{{ url_for('shop.home') }}" aria-label="{{ biz.name }} home">
+      <img src="{{ url_for('static', filename='images/cth_logo.png') }}" alt="{{ biz.name }}" width="204" height="46">
     </a>
+    <nav class="main-nav" aria-label="Shop sections">
+      <a href="{{ url_for('shop.home') }}" {% if ep == 'shop.home' %}aria-current="page"{% endif %}>Home</a>
+      <a href="{{ url_for('shop.catalog') }}" {% if ep in ('shop.catalog','shop.product') and not request.args.get('category') %}aria-current="page"{% endif %}>All products</a>
+      {% for name, tone, icon, n in nav_categories %}
+        <a href="{{ url_for('shop.catalog', category=name) }}" {% if request.args.get('category') == name %}aria-current="page"{% endif %}>{{ name }}</a>
+      {% endfor %}
+    </nav>
     <form class="head-search" action="{{ url_for('shop.catalog') }}" method="get" role="search">
-      <input type="search" name="q" value="{{ q|default('') }}" placeholder="Search products" aria-label="Search products">
+      <input type="search" name="q" value="{{ q|default('') }}" placeholder="Search products..." aria-label="Search products">
       <button type="submit" aria-label="Search"><svg class="ic"><use href="#i-search"/></svg></button>
     </form>
     <nav class="head-nav" aria-label="Account and cart">
@@ -95,21 +105,12 @@
     </nav>
   </div>
 </header>
-<nav class="subnav" aria-label="Shop sections"><div class="wrap">
-  <a href="{{ url_for('shop.home') }}" {% if ep == 'shop.home' %}aria-current="page"{% endif %}>Home</a>
-  <a href="{{ url_for('shop.catalog') }}" {% if ep in ('shop.catalog','shop.product') and not request.args.get('category') %}aria-current="page"{% endif %}>All products</a>
-  {% for name, tone, icon, n in nav_categories %}
-    <a href="{{ url_for('shop.catalog', category=name) }}" {% if request.args.get('category') == name %}aria-current="page"{% endif %}>{{ name }}</a>
-  {% endfor %}
-</div></nav>
-
 <!-- Slide-out menu (phones and tablets) -->
 <div class="drawer-scrim" id="drawerScrim" hidden></div>
 <aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true">
   <div class="drawer-head">
-    <a class="brand" href="{{ url_for('shop.home') }}">
-      <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="36" height="36">
-      <span>{{ biz.name }}</span>
+    <a class="brand" href="{{ url_for('shop.home') }}" aria-label="{{ biz.name }} home">
+      <img src="{{ url_for('static', filename='images/cth_logo_dark.png') }}" alt="{{ biz.name }}" width="153" height="35">
     </a>
     <button class="drawer-close" id="drawerClose" type="button" aria-label="Close menu"><svg class="ic"><use href="#i-close"/></svg></button>
   </div>
@@ -190,10 +191,10 @@
 <footer class="site-foot">
   <div class="wrap foot-grid">
     <div class="foot-brand">
-      <a class="brand" href="{{ url_for('shop.home') }}">
-        <img src="{{ url_for('static', filename='images/cth_mark.png') }}" alt="" width="40" height="40">
-        <span>{{ biz.name }}</span>
+      <a class="brand" href="{{ url_for('shop.home') }}" aria-label="{{ biz.name }} home">
+        <img src="{{ url_for('static', filename='images/cth_logo_dark.png') }}" alt="{{ biz.name }}" width="238" height="54">
       </a>
+      <p class="foot-tag">Innovation. Performance. Value.</p>
       <ul class="foot-contact">
         {% if biz.address %}<li><svg class="ic"><use href="#i-pin"/></svg><span>{{ biz.address }}</span></li>{% endif %}
         {% if biz.phone %}<li><svg class="ic"><use href="#i-call"/></svg><a href="tel:{{ biz.phone }}">{{ biz.phone }}</a></li>{% endif %}
@@ -234,6 +235,9 @@
     <div>
       <h3>Paying and getting it</h3>
       <p>Pay with Paynow or PayPal, or pay at the shop when you collect. Choose delivery at checkout, or collect in store.</p>
+      <ul class="accept" aria-label="Ways to pay">
+        <li>Paynow</li><li>PayPal</li><li>Pay at the shop</li>
+      </ul>
     </div>
   </div>
   <div class="wrap foot-copy">

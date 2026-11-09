@@ -1,21 +1,26 @@
 {% extends 'shop/base.html' %}
 {% from 'shop/_card.html' import product_card with context %}
 {% block content %}
-<div class="wrap">
-  <section class="hero" aria-label="Welcome">
+<div class="hero-zone">
+<section class="hero-band" aria-label="Welcome">
+  <div class="wrap hero">
     <div class="hero-copy">
-      <h1>Laptops, phones and gadgets you can trust.</h1>
+      <h1>Laptops, phones and gadgets <span class="accent">you can trust.</span></h1>
       <p class="lead">See what's in stock, pay online or at the shop, then collect your order or have it delivered.</p>
+      <p class="lead-short">Premium tech. Great prices.</p>
       <div class="actions">
-        <a class="btn btn-gold" href="{{ url_for('shop.catalog') }}">Shop now</a>
-        {% if biz.whatsapp %}<a class="btn btn-light" href="https://wa.me/{{ biz.whatsapp }}">Chat on WhatsApp</a>{% endif %}
+        <a class="btn btn-gold btn-pill" href="{{ url_for('shop.catalog') }}"><svg class="ic"><use href="#i-cart"/></svg><span class="lbl-full">Shop all products</span><span class="lbl-short">Shop now</span><svg class="ic"><use href="#i-next"/></svg></a>
+        {% if biz.whatsapp %}<a class="btn btn-outline btn-pill" href="https://wa.me/{{ biz.whatsapp }}">Chat on WhatsApp<svg class="ic"><use href="#i-next"/></svg></a>{% endif %}
       </div>
-      <ul class="hero-points">
-        <li>{{ total }} items in stock</li>
-        <li>Collect in store or delivery</li>
-        <li>Paynow &amp; PayPal accepted</li>
-      </ul>
     </div>
+
+    {% if hot and hot[0].image %}
+    <a class="hero-art" href="{{ url_for('shop.product', product_id=hot[0].id) }}" aria-label="Hot selling: {{ hot[0].title }}">
+      <img src="{{ hot[0].image }}" alt="" width="320" height="320">
+      <span class="hot-tag">Hot selling</span>
+      <span class="art-price">{{ hot[0].price|money }}</span>
+    </a>
+    {% endif %}
 
     {% if hot %}
     <div class="spotlight" id="spotlight" role="region" aria-roledescription="carousel" aria-label="Hot selling items">
@@ -41,17 +46,30 @@
       </div>
     </div>
     {% endif %}
-  </section>
+  </div>
+</section>
 
-  <nav class="cat-row" aria-label="Browse by category">
-    {% for name, tone, icon, n in nav_categories %}
-    <a class="cat-tile" data-tone="{{ tone }}" href="{{ url_for('shop.catalog', category=name) }}">
-      <span class="cat-ic"><svg class="ic"><use href="#i-{{ icon }}"/></svg></span>
-      <strong>{{ name }}</strong><small>{{ n }} in stock</small>
-    </a>
-    {% endfor %}
-  </nav>
+<div class="trust"><div class="wrap"><ul>
+  <li><svg class="ic"><use href="#i-box"/></svg><span>{{ total }} items in stock</span></li>
+  <li><svg class="ic"><use href="#i-card"/></svg><span>Paynow &amp; PayPal</span></li>
+  <li><svg class="ic"><use href="#i-pin"/></svg><span>Collect in store or delivery</span></li>
+</ul></div></div>
 </div>
+
+<section class="section" aria-label="Browse by category">
+  <div class="wrap">
+    <div class="section-head"><h2>Shop by category</h2><a href="{{ url_for('shop.catalog') }}">View all</a></div>
+    <nav class="cat-row">
+      {% for name, tone, icon, n in nav_categories %}
+      <a class="cat-tile" data-tone="{{ tone }}" href="{{ url_for('shop.catalog', category=name) }}">
+        <span class="cat-ic"><svg class="ic"><use href="#i-{{ icon }}"/></svg></span>
+        <span class="cat-text"><strong>{{ name }}</strong><small>{{ n }} in stock</small></span>
+        <span class="cat-go"><svg class="ic"><use href="#i-next"/></svg></span>
+      </a>
+      {% endfor %}
+    </nav>
+  </div>
+</section>
 
 <section class="section">
   <div class="wrap">
@@ -70,10 +88,13 @@
 </section>
 {% endif %}
 
-<section class="band">
+<section class="section">
   <div class="wrap">
-    <div><h2>Can't see what you need?</h2><p class="muted" style="margin:0">Tell us what you're looking for and we'll check if we can get it.</p></div>
-    {% if biz.whatsapp %}<a class="btn btn-gold" href="https://wa.me/{{ biz.whatsapp }}?text={{ 'Hi, I am looking for...'|urlencode }}">Ask on WhatsApp</a>{% elif biz.phone %}<a class="btn btn-gold" href="tel:{{ biz.phone }}">Call {{ biz.phone }}</a>{% else %}<a class="btn btn-gold" href="{{ url_for('shop.track') }}">Track an order</a>{% endif %}
+    <div class="cta-band">
+      <span class="cta-ic"><svg class="ic"><use href="#i-chat"/></svg></span>
+      <div class="cta-copy"><h2>Can't see what you need?</h2><p>Tell us what you're looking for and we'll check if we can get it.</p></div>
+      {% if biz.whatsapp %}<a class="btn btn-gold btn-pill" href="https://wa.me/{{ biz.whatsapp }}?text={{ 'Hi, I am looking for...'|urlencode }}">Ask on WhatsApp<svg class="ic"><use href="#i-next"/></svg></a>{% elif biz.phone %}<a class="btn btn-gold btn-pill" href="tel:{{ biz.phone }}">Call {{ biz.phone }}<svg class="ic"><use href="#i-next"/></svg></a>{% else %}<a class="btn btn-gold btn-pill" href="{{ url_for('shop.track') }}">Track an order<svg class="ic"><use href="#i-next"/></svg></a>{% endif %}
+    </div>
   </div>
 </section>
 
